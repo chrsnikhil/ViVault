@@ -19,9 +19,9 @@ export const Presentation: React.FC = () => {
   return (
     <Card data-testId="presentation" className="w-full md:max-w-md bg-white p-8 shadow-sm">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">Dynamic & Secure DCA on Base</CardTitle>
+        <CardTitle className="text-2xl font-bold">Dynamic & Secure DCA on Base Sepolia</CardTitle>
         <CardDescription className="text-gray-600">
-          Automated Dollar-Cost Averaging for Wrapped Bitcoin (wBtc)
+          Automated Dollar-Cost Averaging for ETH to WETH - Testnet
         </CardDescription>
       </CardHeader>
 
@@ -29,10 +29,12 @@ export const Presentation: React.FC = () => {
 
       <CardContent className="text-center">
         <p className="text-gray-700">
-          Welcome to the Vincent DCA Service. This application allows you to set up automated
-          dollar-cost-averaging for your wBtc investments on Base.
+          Welcome to the Vincent DCA Service. This application is configured for Base Sepolia
+          testnet.
         </p>
-        <p className="mt-4 text-gray-700">Support for more chains coming soon.</p>
+        <p className="mt-4 text-gray-700">
+          Test ETH to WETH DCA functionality with free testnet tokens!
+        </p>
         <p className="mt-4 text-gray-700">
           To get started, please Connect with Vincent to manage your DCA schedules.
         </p>

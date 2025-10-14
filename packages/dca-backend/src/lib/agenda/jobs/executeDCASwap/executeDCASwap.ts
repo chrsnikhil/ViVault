@@ -36,10 +36,12 @@ export type JobParams = {
 
 const { BASE_RPC_URL, VINCENT_APP_ID } = env;
 
-const BASE_CHAIN_ID = 8453;
-const BASE_USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
-const BASE_WBTC_ADDRESS = '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c';
-const BASE_UNISWAP_V3_ROUTER = '0x2626664c2603336E57B271c5C0b26F421741e481';
+const BASE_CHAIN_ID = 84532; // Base Sepolia testnet
+// Note: Base Sepolia may not have official USDC/WBTC tokens
+// These are placeholder addresses - DCA functionality will need to be tested with mock tokens
+const BASE_USDC_ADDRESS = '0x0000000000000000000000000000000000000000'; // Placeholder - no official USDC on Base Sepolia
+const BASE_WBTC_ADDRESS = '0x0000000000000000000000000000000000000000'; // Placeholder - no official WBTC on Base Sepolia
+const BASE_UNISWAP_V3_ROUTER = '0x0000000000000000000000000000000000000000'; // Placeholder - no Uniswap on Base Sepolia
 
 const baseProvider = new ethers.providers.StaticJsonRpcProvider(BASE_RPC_URL);
 const usdcContract = getERC20Contract(BASE_USDC_ADDRESS, baseProvider);
