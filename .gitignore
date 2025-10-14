@@ -6,9 +6,8 @@ node_modules
 data
 
 # dotEnv files should not be committed
-.env*
-!.env.vault
-!.env.example*
+# .env*
+# !.env.vault
 
 # IDE config
 /.idea

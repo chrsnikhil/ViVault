@@ -55,7 +55,7 @@ export const DialogueEditDCA: React.FC<EditDialogProps> = ({ dca, onUpdate }) =>
         setLoading(false);
       }
     },
-    [dca, editDCA, frequency, onUpdate, purchaseAmount]
+    [dca, editDCA, frequency, onUpdate, purchaseAmount, data.name]
   );
 
   return (
