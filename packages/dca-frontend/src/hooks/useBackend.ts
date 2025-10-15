@@ -8,44 +8,32 @@ const { VITE_APP_ID, VITE_BACKEND_URL, VITE_REDIRECT_URI } = env;
 
 type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
-export type DCA = {
-  lastRunAt: string;
-  nextRunAt: string;
-  lastFinishedAt: string;
-  failedAt: string;
-  _id: string;
-  disabled: boolean;
-  failReason: string;
-  data: {
-    name: string;
-    purchaseAmount: number;
-    purchaseIntervalHuman: string;
-    vincentAppVersion: number;
-    pkpInfo: {
-      ethAddress: string;
-      publicKey: string;
-      tokenId: string;
-    };
-    updatedAt: string;
-  };
-};
-
-export interface CreateDCARequest {
-  name: string;
-  purchaseAmount: string;
-  purchaseIntervalHuman: string;
-}
-
 export const useBackend = () => {
   const { authInfo } = useJwtContext();
   const vincentWebAuthClient = useVincentWebAuthClient(VITE_APP_ID);
 
+  // Debug: Log authentication state
+  console.log('useBackend - authInfo:', authInfo);
+  console.log('useBackend - VITE_APP_ID:', VITE_APP_ID);
+  console.log('useBackend - VITE_REDIRECT_URI:', VITE_REDIRECT_URI);
+
   const getJwt = useCallback(() => {
-    // Redirect to Vincent Auth consent page with appId and version
-    vincentWebAuthClient.redirectToConnectPage({
-      // consentPageUrl: `http://localhost:3000/`,
-      redirectUri: VITE_REDIRECT_URI,
-    });
+    try {
+      console.log('Starting Vincent authentication...', {
+        appId: VITE_APP_ID,
+        redirectUri: VITE_REDIRECT_URI,
+      });
+
+      // Redirect to Vincent Auth consent page with appId and version
+      vincentWebAuthClient.redirectToConnectPage({
+        redirectUri: VITE_REDIRECT_URI,
+      });
+    } catch (error) {
+      console.error('Vincent authentication error:', error);
+      throw new Error(
+        `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   }, [vincentWebAuthClient]);
 
   const sendRequest = useCallback(
@@ -82,52 +70,8 @@ export const useBackend = () => {
     [authInfo]
   );
 
-  const createDCA = useCallback(
-    async (dca: CreateDCARequest) => {
-      return sendRequest<DCA>('/schedule', 'POST', dca);
-    },
-    [sendRequest]
-  );
-
-  const getDCAs = useCallback(async () => {
-    return sendRequest<DCA[]>('/schedules', 'GET');
-  }, [sendRequest]);
-
-  const disableDCA = useCallback(
-    async (scheduleId: string) => {
-      return sendRequest<DCA>(`/schedules/${scheduleId}/disable`, 'PUT');
-    },
-    [sendRequest]
-  );
-
-  const enableDCA = useCallback(
-    async (scheduleId: string) => {
-      return sendRequest<DCA>(`/schedules/${scheduleId}/enable`, 'PUT');
-    },
-    [sendRequest]
-  );
-
-  const editDCA = useCallback(
-    async (scheduleId: string, dca: CreateDCARequest) => {
-      return sendRequest<DCA>(`/schedules/${scheduleId}`, 'PUT', dca);
-    },
-    [sendRequest]
-  );
-
-  const deleteDCA = useCallback(
-    async (scheduleId: string) => {
-      return sendRequest<DCA>(`/schedules/${scheduleId}`, 'DELETE');
-    },
-    [sendRequest]
-  );
-
   return {
-    createDCA,
-    deleteDCA,
-    disableDCA,
-    editDCA,
-    enableDCA,
-    getDCAs,
     getJwt,
+    sendRequest,
   };
 };

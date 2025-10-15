@@ -6,15 +6,7 @@ import helmet from 'helmet';
 import { createVincentUserMiddleware } from '@lit-protocol/vincent-app-sdk/expressMiddleware';
 import { getAppInfo, getPKPInfo, isAppUser } from '@lit-protocol/vincent-app-sdk/jwt';
 
-import { handleListPurchasesRoute } from './purchases';
-import {
-  handleListSchedulesRoute,
-  handleEnableScheduleRoute,
-  handleDisableScheduleRoute,
-  handleCreateScheduleRoute,
-  handleDeleteScheduleRoute,
-  handleEditScheduleRoute,
-} from './schedules';
+// DCA-specific routes removed - keeping only Vincent authentication
 import { userKey, VincentAuthenticatedRequest } from './types';
 import { env } from '../env';
 import { serviceLogger } from '../logger';
@@ -57,32 +49,26 @@ export const registerRoutes = (app: Express) => {
   }
   app.use(cors(corsConfig));
 
-  app.get('/purchases', middleware, setSentryUserMiddleware, handler(handleListPurchasesRoute));
-  app.get('/schedules', middleware, setSentryUserMiddleware, handler(handleListSchedulesRoute));
-  app.post('/schedule', middleware, setSentryUserMiddleware, handler(handleCreateScheduleRoute));
-  app.put(
-    '/schedules/:scheduleId',
+  // Basic health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({ message: 'Vincent App Backend is running', status: 'ok' });
+  });
+
+  // Example authenticated endpoint - you can add your own routes here
+  app.get(
+    '/user-info',
     middleware,
     setSentryUserMiddleware,
-    handler(handleEditScheduleRoute)
-  );
-  app.put(
-    '/schedules/:scheduleId/enable',
-    middleware,
-    setSentryUserMiddleware,
-    handler(handleEnableScheduleRoute)
-  );
-  app.put(
-    '/schedules/:scheduleId/disable',
-    middleware,
-    setSentryUserMiddleware,
-    handler(handleDisableScheduleRoute)
-  );
-  app.delete(
-    '/schedules/:scheduleId',
-    middleware,
-    setSentryUserMiddleware,
-    handler(handleDeleteScheduleRoute)
+    handler((req: VincentAuthenticatedRequest, res) => {
+      const { user } = req;
+      res.json({
+        data: {
+          appInfo: getAppInfo(user.decodedJWT),
+          ethAddress: getPKPInfo(user.decodedJWT).ethAddress,
+        },
+        success: true,
+      });
+    })
   );
 
   serviceLogger.info(`Routes registered`);
