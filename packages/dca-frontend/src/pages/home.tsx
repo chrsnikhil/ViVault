@@ -1,24 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import ComponentGallery from '@/components/component-gallery';
-import { Wallet } from '@/components/wallet';
-import { Menu, X, ArrowRight, CheckCircle, Clock, DollarSign } from 'lucide-react';
+import { WalletModal } from '@/components/wallet-modal';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Menu, X, ArrowRight, CheckCircle, Clock, DollarSign, WalletIcon } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   // Framer Motion variants following styleguide patterns
   const fadeInUp = {
@@ -96,6 +91,15 @@ export const Home: React.FC = () => {
                         <span className="text-foreground font-semibold text-lg">MicroLend</span>
                       </div>
                       <div className="flex items-center gap-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setWalletModalOpen(true)}
+                        >
+                          <WalletIcon className="size-4 mr-2" />
+                          Wallet
+                        </Button>
+                        <ThemeToggle />
                         <Button size="sm" variant="ghost">
                           Sign in
                         </Button>
@@ -152,51 +156,51 @@ export const Home: React.FC = () => {
           <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={stagger}>
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
                       <DollarSign className="size-5 text-primary" />
                     </div>
                     <CardTitle className="text-lg">Transparent rates</CardTitle>
                   </div>
-                  <CardDescription>No hidden fees, ever.</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 text-muted-foreground leading-relaxed">
-                  Clear pricing with upfront terms so you always know what you'll pay.
+                  <CardDescription className="mb-3">No hidden fees, ever.</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Clear pricing with upfront terms so you always know what you'll pay.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
 
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
                       <Clock className="size-5 text-primary" />
                     </div>
                     <CardTitle className="text-lg">Lightning approvals</CardTitle>
                   </div>
-                  <CardDescription>Decisions in minutes</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 text-muted-foreground leading-relaxed">
-                  Simple application and fast verification to get you funded sooner.
+                  <CardDescription className="mb-3">Decisions in minutes</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Simple application and fast verification to get you funded sooner.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
 
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
                       <CheckCircle className="size-5 text-primary" />
                     </div>
                     <CardTitle className="text-lg">Flexible repayments</CardTitle>
                   </div>
-                  <CardDescription>Match your cash flow</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 text-muted-foreground leading-relaxed">
-                  Choose a repayment schedule that works for your business seasonality.
+                  <CardDescription className="mb-3">Match your cash flow</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Choose a repayment schedule that works for your business seasonality.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -217,7 +221,7 @@ export const Home: React.FC = () => {
           <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={stagger}>
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <Badge
                       variant="default"
@@ -227,12 +231,10 @@ export const Home: React.FC = () => {
                     </Badge>
                     <CardTitle className="text-lg">Apply</CardTitle>
                   </div>
-                  <CardDescription>5-minute form</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 text-muted-foreground leading-relaxed pb-4">
-                  Tell us about your business and funding needs—no jargon, no hassles.
-                </CardContent>
-                <CardFooter className="px-6 pb-6">
+                  <CardDescription className="mb-3">5-minute form</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed mb-4">
+                    Tell us about your business and funding needs—no jargon, no hassles.
+                  </p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -240,13 +242,13 @@ export const Home: React.FC = () => {
                   >
                     Start application
                   </Button>
-                </CardFooter>
+                </CardContent>
               </Card>
             </motion.div>
 
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <Badge
                       variant="default"
@@ -256,12 +258,10 @@ export const Home: React.FC = () => {
                     </Badge>
                     <CardTitle className="text-lg">Get approved</CardTitle>
                   </div>
-                  <CardDescription>Quick decision</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 text-muted-foreground leading-relaxed pb-4">
-                  We review your information and provide an offer with clear terms.
-                </CardContent>
-                <CardFooter className="px-6 pb-6">
+                  <CardDescription className="mb-3">Quick decision</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed mb-4">
+                    We review your information and provide an offer with clear terms.
+                  </p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -269,13 +269,13 @@ export const Home: React.FC = () => {
                   >
                     View sample terms
                   </Button>
-                </CardFooter>
+                </CardContent>
               </Card>
             </motion.div>
 
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="px-6 py-6 pb-4">
+                <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <Badge
                       variant="default"
@@ -285,19 +285,17 @@ export const Home: React.FC = () => {
                     </Badge>
                     <CardTitle className="text-lg">Receive funds</CardTitle>
                   </div>
-                  <CardDescription>Fast transfer</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 text-muted-foreground leading-relaxed pb-4">
-                  Accept the offer and get funds to your account—usually same day.
-                </CardContent>
-                <CardFooter className="px-6 pb-6">
+                  <CardDescription className="mb-3">Fast transfer</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed mb-4">
+                    Accept the offer and get funds to your account—usually same day.
+                  </p>
                   <Button
                     size="sm"
                     className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   >
                     Apply now
                   </Button>
-                </CardFooter>
+                </CardContent>
               </Card>
             </motion.div>
           </motion.div>
@@ -315,25 +313,6 @@ export const Home: React.FC = () => {
           </motion.div>
           <motion.div variants={fadeInUp}>
             <ComponentGallery />
-          </motion.div>
-        </section>
-
-        {/* Vincent Wallet Integration */}
-        <section className="mx-auto max-w-7xl px-6 pb-20">
-          <motion.div className="mb-8" variants={fadeInUp}>
-            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
-              Your Vincent Wallet
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              Secure blockchain integration powered by Vincent Protocol.
-            </p>
-          </motion.div>
-          <motion.div variants={fadeInUp}>
-            <Card className="border shadow-sm">
-              <CardContent className="p-8">
-                <Wallet />
-              </CardContent>
-            </Card>
           </motion.div>
         </section>
 
@@ -372,6 +351,9 @@ export const Home: React.FC = () => {
           </motion.div>
         </footer>
       </motion.div>
+
+      {/* Wallet Modal */}
+      <WalletModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
     </main>
   );
 };
