@@ -95,28 +95,28 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 shadow-2xl border-2 border-black rounded-2xl">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-3 text-xl font-semibold text-black">
+      <DialogContent className="max-w-lg p-0 shadow-2xl border-2 border-border rounded-2xl">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="flex items-center gap-3 text-xl font-semibold text-foreground">
             <WalletIcon className="size-6" />
             Your Vincent Wallet
           </DialogTitle>
         </DialogHeader>
 
         <div className="px-6 py-6 space-y-6">
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Secure blockchain integration powered by Vincent Protocol.
           </p>
 
           {/* Wallet Address Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-black">Wallet Address</h3>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+            <h3 className="text-sm font-medium text-foreground">Wallet Address</h3>
+            <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
               <a
                 href={`${chain.blockExplorerUrls[0]}/address/${authInfo?.pkp.ethAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-sm text-blue-600 hover:text-blue-800 underline"
+                className="font-mono text-sm text-primary hover:text-primary/80 underline"
                 title={authInfo?.pkp.ethAddress}
               >
                 {formatAddress(authInfo?.pkp.ethAddress)}
@@ -128,7 +128,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
                 disabled={!authInfo?.pkp.ethAddress}
                 title={copied ? 'Copied!' : 'Copy address'}
                 aria-label="Copy wallet address"
-                className="size-8 border-gray-300 hover:bg-gray-100"
+                className="size-8"
               >
                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               </Button>
@@ -137,37 +137,39 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
 
           {/* Network Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-black">Network</h3>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-              <span className="text-sm text-gray-700">{chain.name}</span>
-              <Badge className="bg-blue-100 text-blue-800 border-blue-200">{chain.name}</Badge>
+            <h3 className="text-sm font-medium text-foreground">Network</h3>
+            <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
+              <span className="text-sm text-foreground">{chain.name}</span>
+              <Badge className="bg-secondary text-secondary-foreground border-border">
+                {chain.name}
+              </Badge>
             </div>
           </div>
 
           {/* Balances Section */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-black">Balances</h3>
+            <h3 className="text-sm font-medium text-foreground">Balances</h3>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-sm font-medium text-gray-700">ETH Balance</span>
-                <span className="font-semibold text-black">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
+                <span className="text-sm font-medium text-foreground">ETH Balance</span>
+                <span className="font-semibold text-foreground">
                   {isLoadingBalance
                     ? 'Loading...'
                     : `${parseFloat(ethBalance).toFixed(8)} ${chain.symbol}`}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-sm font-medium text-gray-700">USDC Balance</span>
-                <span className="font-semibold text-black">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
+                <span className="text-sm font-medium text-foreground">USDC Balance</span>
+                <span className="font-semibold text-foreground">
                   {isLoadingBalance ? 'Loading...' : `${parseFloat(usdcBalance).toFixed(6)} USDC`}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-sm font-medium text-gray-700">WETH Balance</span>
-                <span className="font-semibold text-black">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
+                <span className="text-sm font-medium text-foreground">WETH Balance</span>
+                <span className="font-semibold text-foreground">
                   {isLoadingBalance ? 'Loading...' : `${parseFloat(wethBalance).toFixed(8)} WETH`}
                 </span>
               </div>
@@ -175,7 +177,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm">
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-sm">
               <span role="img" aria-label="Error" className="mr-2">
                 ⚠️
               </span>
