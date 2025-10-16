@@ -19,9 +19,11 @@ export const useBackend = () => {
 
   const getJwt = useCallback(() => {
     try {
-      console.log('Starting Vincent authentication...', {
+      console.log('🔍 DEBUG: Starting Vincent authentication...', {
         appId: VITE_APP_ID,
         redirectUri: VITE_REDIRECT_URI,
+        expectedUri: 'http://localhost:5173',
+        isCorrect: VITE_REDIRECT_URI === 'http://localhost:5173',
       });
 
       // Redirect to Vincent Auth consent page with appId and version

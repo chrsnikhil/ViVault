@@ -40,9 +40,9 @@ console.log('All import.meta.env:', import.meta.env);
 export const env = {
   VITE_APP_ID: 711198988, // Hardcoded for now
   VITE_BACKEND_URL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001',
-  VITE_EXPECTED_AUDIENCE: import.meta.env.VITE_EXPECTED_AUDIENCE || 'http://localhost:5174',
+  VITE_EXPECTED_AUDIENCE: import.meta.env.VITE_EXPECTED_AUDIENCE || 'http://localhost:5173',
   VITE_IS_DEVELOPMENT: import.meta.env.VITE_IS_DEVELOPMENT === 'true' || true,
-  VITE_REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5174',
+  VITE_REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5173',
   VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
   VITE_SENTRY_FILTER: import.meta.env.VITE_SENTRY_FILTER,
 };

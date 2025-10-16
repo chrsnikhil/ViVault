@@ -8,12 +8,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ComponentGallery from '@/components/component-gallery';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { PriceFeeds } from '@/components/price-feeds';
+import { PythTest } from '@/components/pyth-test';
 import { Menu, X, ArrowRight, CheckCircle, Clock, DollarSign, WalletIcon } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [showPythTest, setShowPythTest] = useState(false);
 
   // Framer Motion variants following styleguide patterns
   const fadeInUp = {
@@ -108,6 +111,9 @@ export const Home: React.FC = () => {
                           className="bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                           Apply now
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowPythTest(true)}>
+                          Test Pyth API
                         </Button>
                       </div>
                     </div>
@@ -300,6 +306,34 @@ export const Home: React.FC = () => {
             </motion.div>
           </motion.div>
         </section>
+
+        {/* Price Feeds */}
+        <section className="mx-auto max-w-7xl px-6 pb-20">
+          <motion.div variants={fadeInUp}>
+            <PriceFeeds />
+          </motion.div>
+        </section>
+
+        {/* Pyth Test Section */}
+        {showPythTest && (
+          <section className="mx-auto max-w-7xl px-6 pb-20">
+            <motion.div variants={fadeInUp}>
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-3xl md:text-4xl font-semibold text-foreground">
+                  Pyth Network Test Suite
+                </h2>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPythTest(false)}
+                  className="border-input hover:bg-accent"
+                >
+                  Close
+                </Button>
+              </div>
+              <PythTest />
+            </motion.div>
+          </section>
+        )}
 
         {/* Component Gallery */}
         <section className="mx-auto max-w-7xl px-6 pb-20">
