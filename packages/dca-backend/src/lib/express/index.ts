@@ -10,7 +10,6 @@ import { getAppInfo, getPKPInfo, isAppUser } from '@lit-protocol/vincent-app-sdk
 import { userKey, VincentAuthenticatedRequest } from './types';
 import { env } from '../env';
 import { serviceLogger } from '../logger';
-import { PythService } from '../pyth/pythService';
 
 const { ALLOWED_AUDIENCE, CORS_ALLOWED_DOMAIN, IS_DEVELOPMENT, VINCENT_APP_ID } = env;
 
@@ -19,9 +18,6 @@ const { handler, middleware } = createVincentUserMiddleware({
   allowedAudience: ALLOWED_AUDIENCE,
   requiredAppId: VINCENT_APP_ID,
 });
-
-// Initialize Pyth service
-const pythService = new PythService();
 
 const corsConfig = {
   optionsSuccessStatus: 204,
@@ -72,131 +68,6 @@ export const registerRoutes = (app: Express) => {
         },
         success: true,
       });
-    })
-  );
-
-  // Pyth price feed endpoints (public - no authentication required)
-  app.get('/api/pyth/health', async (req, res) => {
-    try {
-      const health = await pythService.getHealthStatus();
-      res.json({
-        data: health,
-        success: true,
-      });
-    } catch (error) {
-      serviceLogger.error('Pyth health check failed:', error);
-      res.status(500).json({
-        data: { error: 'Failed to check Pyth health' },
-        success: false,
-      });
-    }
-  });
-
-  app.get('/api/pyth/price-feeds', async (req, res) => {
-    try {
-      const priceFeeds = await pythService.getPopularCryptoPrices();
-      res.json({
-        data: priceFeeds,
-        success: true,
-      });
-    } catch (error) {
-      serviceLogger.error('Failed to fetch price feeds:', error);
-      res.status(500).json({
-        data: { error: 'Failed to fetch price feeds' },
-        success: false,
-      });
-    }
-  });
-
-  app.get('/api/pyth/price-feed-ids', async (req, res) => {
-    try {
-      const feedIds = await pythService.getPriceFeedIds();
-      return res.json({
-        data: feedIds,
-        success: true,
-      });
-    } catch (error) {
-      serviceLogger.error('Failed to fetch price feed IDs:', error);
-      return res.status(500).json({
-        data: { error: 'Failed to fetch price feed IDs' },
-        success: false,
-      });
-    }
-  });
-
-  app.post(
-    '/api/pyth/latest-prices',
-    middleware,
-    setSentryUserMiddleware,
-    handler(async (req: VincentAuthenticatedRequest, res) => {
-      try {
-        const { binary, ids, verbose } = req.body;
-
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-          return res.status(400).json({
-            data: { error: 'ids array is required' },
-            success: false,
-          });
-        }
-
-        const priceFeeds = await pythService.getLatestPriceFeeds({
-          ids,
-          binary: binary || false,
-          verbose: verbose || false,
-        });
-
-        return res.json({
-          data: priceFeeds,
-          success: true,
-        });
-      } catch (error) {
-        serviceLogger.error('Failed to fetch latest prices:', error);
-        return res.status(500).json({
-          data: { error: 'Failed to fetch latest prices' },
-          success: false,
-        });
-      }
-    })
-  );
-
-  app.post(
-    '/api/pyth/twap',
-    middleware,
-    setSentryUserMiddleware,
-    handler(async (req: VincentAuthenticatedRequest, res) => {
-      try {
-        const { encoding, ids, parsed, window_seconds } = req.body;
-
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-          return res.status(400).json({
-            data: { error: 'ids array is required' },
-            success: false,
-          });
-        }
-
-        if (!window_seconds || typeof window_seconds !== 'number') {
-          return res.status(400).json({
-            data: { error: 'window_seconds is required and must be a number' },
-            success: false,
-          });
-        }
-
-        const twapData = await pythService.getTwapLatest(ids, window_seconds, {
-          encoding,
-          parsed,
-        });
-
-        return res.json({
-          data: twapData,
-          success: true,
-        });
-      } catch (error) {
-        serviceLogger.error('Failed to fetch TWAP data:', error);
-        return res.status(500).json({
-          data: { error: 'Failed to fetch TWAP data' },
-          success: false,
-        });
-      }
     })
   );
 

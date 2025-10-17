@@ -1,0 +1,35 @@
+{
+  "contracts/UserVault.sol": {
+    "jobHash": "solc-0_8_28-74a4294536d123b30291c7aea9af43d42b418b13",
+    "isolated": false,
+    "artifactPaths": [
+      "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\UserVault.sol\\UserVault.json"
+    ],
+    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-2e4591bf63a860a6fbb597ce70b9553b7659c5ce.json",
+    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-2e4591bf63a860a6fbb597ce70b9553b7659c5ce.output.json",
+    "typeFilePath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\UserVault.sol\\artifacts.d.ts",
+    "wasm": false
+  },
+  "contracts/VaultFactory.sol": {
+    "jobHash": "solc-0_8_28-2e4591bf63a860a6fbb597ce70b9553b7659c5ce",
+    "isolated": false,
+    "artifactPaths": [
+      "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VaultFactory.sol\\VaultFactory.json"
+    ],
+    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-2e4591bf63a860a6fbb597ce70b9553b7659c5ce.json",
+    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-2e4591bf63a860a6fbb597ce70b9553b7659c5ce.output.json",
+    "typeFilePath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VaultFactory.sol\\artifacts.d.ts",
+    "wasm": false
+  },
+  "contracts/VolatilityOracle.sol": {
+    "jobHash": "solc-0_8_20-0aebe4c401ce9d55b29717a671ba90c40e8016c2",
+    "isolated": false,
+    "artifactPaths": [
+      "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VolatilityOracle.sol\\VolatilityOracle.json"
+    ],
+    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_20-11106fe4e9b49cc6f51d4ff864b95d397cc75ea7.json",
+    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_20-11106fe4e9b49cc6f51d4ff864b95d397cc75ea7.output.json",
+    "typeFilePath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VolatilityOracle.sol\\artifacts.d.ts",
+    "wasm": false
+  }
+}
