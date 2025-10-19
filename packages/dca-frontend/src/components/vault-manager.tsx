@@ -13,11 +13,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Wallet, Plus, AlertCircle, CheckCircle, Loader2, Copy, RefreshCw } from 'lucide-react';
+import {
+  Wallet,
+  Plus,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Copy,
+  RefreshCw,
+  ArrowUpDown,
+} from 'lucide-react';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 import { useWeb3 } from '@/contexts/web3-context';
 import { useVault, type VaultInfo } from '@/hooks/useVault';
 import { ethers } from 'ethers';
+import { WithdrawPopup } from '@/components/withdraw-popup';
+import { SwapPopup } from '@/components/swap-popup';
 import { CONTRACT_ADDRESSES, COMMON_TOKENS } from '@/config/contracts';
 
 export const VaultManager: React.FC = () => {
@@ -33,6 +44,14 @@ export const VaultManager: React.FC = () => {
   const [customTokens, setCustomTokens] = useState<{
     [address: string]: { name: string; symbol: string; decimals: number };
   }>({});
+  const [withdrawPopupOpen, setWithdrawPopupOpen] = useState(false);
+  const [selectedTokenForWithdraw, setSelectedTokenForWithdraw] = useState<{
+    address: string;
+    symbol: string;
+    balance: string;
+    decimals: number;
+  } | null>(null);
+  const [swapPopupOpen, setSwapPopupOpen] = useState(false);
 
   // Then call other hooks
   const { authInfo } = useJwtContext();
@@ -45,6 +64,8 @@ export const VaultManager: React.FC = () => {
     createVaultWithVincent,
     getVaultInfo,
     getTokenInfo,
+    withdraw,
+    registerExistingTokens,
   } = useVault();
 
   // Direct balance fetching function (like the debug buttons)
@@ -56,25 +77,48 @@ export const VaultManager: React.FC = () => {
       const vaultContract = new ethers.Contract(
         vaultAddress,
         [
+          'function getSupportedTokens() external view returns (address[] memory)',
           'function getBalances(address[] calldata tokens) external view returns (uint256[] memory)',
         ],
         vincentProvider
       );
 
-      const tokenAddresses = Object.values(COMMON_TOKENS);
-      const balancesRaw = await vaultContract.getBalances(tokenAddresses);
+      // First, get the supported tokens from the vault
+      let tokensToCheck = [];
+      try {
+        const supportedTokens = await vaultContract.getSupportedTokens();
+        console.log('🔍 fetchDirectBalances: Supported tokens from vault:', supportedTokens);
+
+        if (supportedTokens.length > 0) {
+          tokensToCheck = supportedTokens;
+        } else {
+          // For new vaults, check common tokens
+          tokensToCheck = Object.values(COMMON_TOKENS);
+        }
+      } catch (supportedTokensError) {
+        console.log(
+          '🔍 fetchDirectBalances: getSupportedTokens() failed, using common tokens:',
+          supportedTokensError
+        );
+        tokensToCheck = Object.values(COMMON_TOKENS);
+      }
+
+      console.log('🔍 fetchDirectBalances: Tokens to check:', tokensToCheck);
+      const balancesRaw = await vaultContract.getBalances(tokensToCheck);
       console.log('🔍 fetchDirectBalances: Raw balances:', balancesRaw);
 
       const balances = await Promise.all(
-        Object.keys(COMMON_TOKENS).map(async (symbol, index) => {
+        tokensToCheck.map(async (tokenAddress: string, index: number) => {
           try {
-            const tokenAddress = COMMON_TOKENS[symbol as keyof typeof COMMON_TOKENS];
             const erc20 = new ethers.Contract(
               tokenAddress,
-              ['function decimals() view returns (uint8)'],
+              [
+                'function symbol() view returns (string)',
+                'function decimals() view returns (uint8)',
+              ],
               vincentProvider
             );
-            const decimals = await erc20.decimals();
+            const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
             return {
               address: tokenAddress,
               symbol: symbol,
@@ -85,10 +129,13 @@ export const VaultManager: React.FC = () => {
               decimals: decimals,
             };
           } catch (tokenError) {
-            console.log(`🔍 fetchDirectBalances: Error getting info for ${symbol}:`, tokenError);
+            console.log(
+              `🔍 fetchDirectBalances: Error getting info for token ${tokenAddress}:`,
+              tokenError
+            );
             return {
-              address: COMMON_TOKENS[symbol as keyof typeof COMMON_TOKENS],
-              symbol: symbol,
+              address: tokenAddress,
+              symbol: 'UNK',
               balance: '0',
               decimals: 18,
             };
@@ -211,6 +258,28 @@ export const VaultManager: React.FC = () => {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const handleWithdrawClick = (token: {
+    address: string;
+    symbol: string;
+    balance: string;
+    decimals: number;
+  }) => {
+    setSelectedTokenForWithdraw(token);
+    setWithdrawPopupOpen(true);
+  };
+
+  const handleWithdraw = async (recipientAddress: string, amount: string) => {
+    if (!vaultAddress || !selectedTokenForWithdraw) {
+      throw new Error('Missing vault address or token information');
+    }
+
+    await withdraw(vaultAddress, selectedTokenForWithdraw.address, amount, recipientAddress);
+
+    // Refresh vault info after successful withdrawal
+    const updatedInfo = await getVaultInfo(vaultAddress);
+    setVaultInfo(updatedInfo);
   };
 
   const refreshVaultStatus = async () => {
@@ -403,19 +472,18 @@ export const VaultManager: React.FC = () => {
         <Alert className="border-2 bg-green-50 dark:bg-green-950/20">
           <CheckCircle className="size-5 text-green-600" />
           <AlertDescription className="text-sm">
-            <strong>✅ Great!</strong> You're using the updated vault contract that properly tracks
-            token balances. Use the "Fetch Direct Balances" button to see your current balances.
+            <strong>✅ Great!</strong> You're using the latest vault contract with enhanced
+            features: proper balance tracking and withdraw-to-any-address functionality. Use the
+            "Fetch Direct Balances" button to see your current balances.
           </AlertDescription>
         </Alert>
       )}
 
       {/* Debug Info */}
-      <Card className="border-2 bg-gray-50 dark:bg-gray-900">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-gray-600 dark:text-gray-400">Debug Info</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
+      <Card className="border-2">
+        <CardContent className="pt-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">Debug Info</h3>
+          <div className="text-xs space-y-1 text-muted-foreground">
             <p>Vincent Account: {vincentAccount || 'None'}</p>
             <p>User Has Vault: {userHasVault ? 'Yes' : 'No'}</p>
             <p>Vault Address: {vaultAddress || 'None'}</p>
@@ -429,7 +497,7 @@ export const VaultManager: React.FC = () => {
                 : '⚠️ Old vault - balances may not show correctly'}
             </p>
             <p>🔍 Debug: Check console for detailed contract call logs</p>
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -524,17 +592,10 @@ export const VaultManager: React.FC = () => {
                       console.log('🔍 Actual WETH balance in vault:', actualBalance.toString());
 
                       if (actualBalance.gt(0)) {
-                        // Register the existing WETH token
-                        const vaultContract = new ethers.Contract(
-                          vaultAddress,
-                          ['function registerExistingTokens(address[] calldata tokens) external'],
-                          vincentProvider
-                        );
-
+                        // Register the existing WETH token using the useVault hook
                         console.log('🔍 Registering WETH token in vault...');
-                        const tx = await vaultContract.registerExistingTokens([wethAddress]);
-                        await tx.wait();
-                        console.log('✅ WETH token registered successfully!');
+
+                        await registerExistingTokens(vaultAddress, [wethAddress]);
 
                         alert(
                           `Successfully registered ${ethers.utils.formatEther(actualBalance)} WETH in vault! Refresh the page to see the balance.`
@@ -550,6 +611,51 @@ export const VaultManager: React.FC = () => {
                 }}
               >
                 Register Existing WETH
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={async () => {
+                  if (vaultAddress && vincentProvider) {
+                    try {
+                      console.log('🔍 Attempting to register existing USDC-Circle...');
+                      const usdcAddress = COMMON_TOKENS.USDC; // 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+
+                      // Check current USDC balance in vault
+                      const usdcContract = new ethers.Contract(
+                        usdcAddress,
+                        [
+                          'function balanceOf(address owner) view returns (uint256)',
+                          'function decimals() view returns (uint8)',
+                        ],
+                        vincentProvider
+                      );
+                      const [actualBalance, decimals] = await Promise.all([
+                        usdcContract.balanceOf(vaultAddress),
+                        usdcContract.decimals(),
+                      ]);
+                      console.log('🔍 Actual USDC balance in vault:', actualBalance.toString());
+
+                      if (actualBalance.gt(0)) {
+                        // Register the existing USDC token using the useVault hook
+                        console.log('🔍 Registering USDC-Circle token in vault...');
+
+                        await registerExistingTokens(vaultAddress, [usdcAddress]);
+
+                        alert(
+                          `Successfully registered ${ethers.utils.formatUnits(actualBalance, decimals)} USDC-Circle in vault! Refresh the page to see the balance.`
+                        );
+                      } else {
+                        alert('No USDC-Circle found in vault.');
+                      }
+                    } catch (err) {
+                      console.error('❌ Error registering USDC-Circle:', err);
+                      alert('Error registering USDC-Circle. Check console for details.');
+                    }
+                  }
+                }}
+              >
+                Register Existing USDC-Circle
               </Button>
               <Button
                 variant="destructive"
@@ -583,16 +689,16 @@ export const VaultManager: React.FC = () => {
       {/* Create Vault */}
       {!userHasVault && (
         <Card className="border-2">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <Plus className="size-6" />
-              Create Your Vault
-            </CardTitle>
-            <CardDescription className="text-base">
-              Create a new vault using Vincent PKP wallet with EVM Transaction Signer Ability
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4">
+          <CardContent className="pt-6 space-y-4">
+            <div className="mb-4">
+              <h2 className="flex items-center gap-3 text-xl font-semibold">
+                <Plus className="size-6" />
+                Create Your Vault
+              </h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Create a new vault using Vincent PKP wallet with EVM Transaction Signer Ability
+              </p>
+            </div>
             {!authInfo?.pkp.ethAddress && (
               <Alert className="border-2 bg-blue-50 dark:bg-blue-950/20">
                 <AlertCircle className="size-5 text-blue-600" />
@@ -629,11 +735,13 @@ export const VaultManager: React.FC = () => {
       {/* Vault Management */}
       {userHasVault && (
         <Card className="border-2">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Vault Management</CardTitle>
-            <CardDescription>Manage your vault operations and deposits</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold">Vault Management</h2>
+              <p className="text-sm text-muted-foreground">
+                Manage your vault operations and deposits
+              </p>
+            </div>
             <Tabs value={view} onValueChange={(value) => setView(value as 'overview')}>
               <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -745,6 +853,15 @@ export const VaultManager: React.FC = () => {
                         <RefreshCw className="size-4 mr-2" />
                         Fetch Direct Balances
                       </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSwapPopupOpen(true)}
+                        disabled={loading}
+                      >
+                        <ArrowUpDown className="size-4 mr-2" />
+                        Swap Tokens
+                      </Button>
                     </div>
                   </div>
 
@@ -835,12 +952,12 @@ export const VaultManager: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <Alert>
-                          <AlertCircle className="size-4" />
-                          <AlertDescription>
+                        <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
+                          <AlertCircle className="size-4 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
                             No tokens deposited yet. Deposit tokens to see balances.
-                          </AlertDescription>
-                        </Alert>
+                          </p>
+                        </div>
                       )
                     ) : selectedToken && selectedToken !== 'custom' ? (
                       // Show selected token
@@ -854,6 +971,7 @@ export const VaultManager: React.FC = () => {
                         const tokenBalance = balance
                           ? parseFloat(balance.balance).toFixed(6)
                           : '0.000000';
+                        const tokenDecimals = balance?.decimals || customToken?.decimals || 18;
 
                         return (
                           <Card className="p-6">
@@ -886,21 +1004,44 @@ export const VaultManager: React.FC = () => {
                                   <Plus className="size-4 mr-2" />
                                   Deposit
                                 </Button>
-                                <Button variant="outline" className="flex-1">
+                                <Button
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={() =>
+                                    handleWithdrawClick({
+                                      address: selectedToken,
+                                      symbol: tokenSymbol,
+                                      balance: tokenBalance,
+                                      decimals: tokenDecimals,
+                                    })
+                                  }
+                                >
                                   Withdraw
                                 </Button>
                               </div>
+                              {/* Swap Button - only show for WETH or USDC-Circle */}
+                              {(selectedToken === COMMON_TOKENS.WETH ||
+                                selectedToken === COMMON_TOKENS.USDC) && (
+                                <Button
+                                  variant="secondary"
+                                  className="w-full"
+                                  onClick={() => setSwapPopupOpen(true)}
+                                >
+                                  <ArrowUpDown className="size-4 mr-2" />
+                                  Swap {tokenSymbol}
+                                </Button>
+                              )}
                             </div>
                           </Card>
                         );
                       })()
                     ) : (
-                      <Alert>
-                        <AlertCircle className="size-4" />
-                        <AlertDescription>
+                      <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
+                        <AlertCircle className="size-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
                           Please select a token to view its balance and details.
-                        </AlertDescription>
-                      </Alert>
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -908,6 +1049,33 @@ export const VaultManager: React.FC = () => {
             </Tabs>
           </CardContent>
         </Card>
+      )}
+
+      {/* Withdraw Popup */}
+      {selectedTokenForWithdraw && (
+        <WithdrawPopup
+          isOpen={withdrawPopupOpen}
+          onClose={() => {
+            setWithdrawPopupOpen(false);
+            setSelectedTokenForWithdraw(null);
+          }}
+          tokenAddress={selectedTokenForWithdraw.address}
+          tokenSymbol={selectedTokenForWithdraw.symbol}
+          tokenBalance={selectedTokenForWithdraw.balance}
+          tokenDecimals={selectedTokenForWithdraw.decimals}
+          onWithdraw={handleWithdraw}
+          loading={loading}
+        />
+      )}
+
+      {/* Swap Popup */}
+      {vaultAddress && (
+        <SwapPopup
+          isOpen={swapPopupOpen}
+          onClose={() => setSwapPopupOpen(false)}
+          vaultAddress={vaultAddress}
+          vaultBalances={vaultInfo?.balances}
+        />
       )}
     </div>
   );

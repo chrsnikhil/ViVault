@@ -49,7 +49,7 @@ export const PKPWalletConnectProvider: React.FC<PKPWalletConnectProviderProps> =
   const [activeSessions, setActiveSessions] = useState<unknown[]>([]);
 
   // Initialize PKP Wallet following the docs exactly
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+
   const initializePKPWallet = useCallback(async () => {
     if (!authInfo?.pkp.ethAddress || !authInfo?.pkp.publicKey) {
       console.log('🔍 No Vincent PKP wallet available for WalletConnect');
@@ -142,6 +142,7 @@ export const PKPWalletConnectProvider: React.FC<PKPWalletConnectProviderProps> =
     } catch (error) {
       console.error('❌ Failed to initialize PKP WalletConnect:', error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authInfo]);
 
   // Set up event listeners following the docs

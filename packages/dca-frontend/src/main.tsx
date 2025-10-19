@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { initZendesk } from '@/lib/zendesk';
+import './polyfills'; // Import polyfills first
 
 import { env } from '@/config/env';
 

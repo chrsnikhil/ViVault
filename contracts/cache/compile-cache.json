@@ -1,23 +1,23 @@
 {
   "contracts/UserVault.sol": {
-    "jobHash": "solc-0_8_28-6bda40e4bf95f90c8a88f98d4952e8d2c8271c11",
+    "jobHash": "solc-0_8_28-3173c7928d4de3538627f3370205133a36d281a9",
     "isolated": false,
     "artifactPaths": [
       "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\UserVault.sol\\UserVault.json"
     ],
-    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-96674874c8d9932bc037d1032c3648804c1c4906.json",
-    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-96674874c8d9932bc037d1032c3648804c1c4906.output.json",
+    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-d3c591ff912dce0a0c9ec69b8482e3eabc83ad15.json",
+    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-d3c591ff912dce0a0c9ec69b8482e3eabc83ad15.output.json",
     "typeFilePath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\UserVault.sol\\artifacts.d.ts",
     "wasm": false
   },
   "contracts/VaultFactory.sol": {
-    "jobHash": "solc-0_8_28-96674874c8d9932bc037d1032c3648804c1c4906",
+    "jobHash": "solc-0_8_28-d3c591ff912dce0a0c9ec69b8482e3eabc83ad15",
     "isolated": false,
     "artifactPaths": [
       "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VaultFactory.sol\\VaultFactory.json"
     ],
-    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-96674874c8d9932bc037d1032c3648804c1c4906.json",
-    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-96674874c8d9932bc037d1032c3648804c1c4906.output.json",
+    "buildInfoPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-d3c591ff912dce0a0c9ec69b8482e3eabc83ad15.json",
+    "buildInfoOutputPath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\build-info\\solc-0_8_28-d3c591ff912dce0a0c9ec69b8482e3eabc83ad15.output.json",
     "typeFilePath": "C:\\Users\\chrsn\\Desktop\\ViVault\\ViVault\\contracts\\artifacts\\contracts\\VaultFactory.sol\\artifacts.d.ts",
     "wasm": false
   },

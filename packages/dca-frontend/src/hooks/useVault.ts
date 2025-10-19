@@ -120,7 +120,7 @@ export const useVault = () => {
       console.log('🔍 Transaction confirmed:', receipt);
 
       // Parse the VaultCreated event to get the vault address
-      const vaultCreatedEvent = receipt.logs.find((log: unknown) => {
+      const vaultCreatedEvent = receipt.logs.find((log: ethers.providers.Log) => {
         try {
           const parsed = factory.interface.parseLog(log);
           return parsed?.name === 'VaultCreated';
@@ -133,7 +133,7 @@ export const useVault = () => {
         throw new Error('VaultCreated event not found in transaction receipt');
       }
 
-      const parsedEvent = factory.interface.parseLog(vaultCreatedEvent as unknown);
+      const parsedEvent = factory.interface.parseLog(vaultCreatedEvent);
       const vaultAddress = parsedEvent?.args.vault;
 
       if (!vaultAddress) {
@@ -141,6 +141,18 @@ export const useVault = () => {
       }
 
       console.log('✅ Vault created successfully with Vincent PKP:', vaultAddress);
+
+      // Automatically register common tokens in the new vault
+      try {
+        console.log('🔍 Auto-registering common tokens in new vault...');
+        const commonTokens = [COMMON_TOKENS.WETH, COMMON_TOKENS.USDC];
+        await registerExistingTokens(vaultAddress, commonTokens);
+        console.log('✅ Common tokens auto-registered in new vault');
+      } catch (autoRegisterError) {
+        console.warn('⚠️ Failed to auto-register common tokens:', autoRegisterError);
+        // Don't fail vault creation if auto-registration fails
+      }
+
       return vaultAddress;
     } catch (err: unknown) {
       const errorMessage =
@@ -320,21 +332,37 @@ export const useVault = () => {
 
         console.log('🔍 getVaultInfo: Getting balances with NEW contract logic...');
         let balancesRaw = [];
+        let tokensToCheck = [];
+
         try {
+          // First, get the supported tokens from the vault
+          const supportedTokens = await vault.getSupportedTokens();
+          console.log('🔍 getVaultInfo: Supported tokens from vault:', supportedTokens);
+
+          // If vault has supported tokens, use those; otherwise check common tokens
+          if (supportedTokens.length > 0) {
+            tokensToCheck = supportedTokens;
+          } else {
+            // For new vaults, check common tokens
+            tokensToCheck = Object.values(COMMON_TOKENS);
+          }
+
+          console.log('🔍 getVaultInfo: Tokens to check for balances:', tokensToCheck);
+
           // NEW: The updated contract's getBalances() now returns actual token balances
-          balancesRaw = await vault.getBalances(Object.values(COMMON_TOKENS));
+          balancesRaw = await vault.getBalances(tokensToCheck);
           console.log('🔍 getVaultInfo: Raw balances (actual token balances):', balancesRaw);
         } catch (balancesError) {
           console.log('🔍 getVaultInfo: getBalances() call failed:', balancesError);
           balancesRaw = [];
+          tokensToCheck = Object.values(COMMON_TOKENS); // Fallback to common tokens
         }
 
         const balances: TokenBalance[] = await Promise.all(
-          Object.keys(COMMON_TOKENS).map(async (symbol, index) => {
+          tokensToCheck.map(async (tokenAddress: string, index: number) => {
             try {
-              const tokenAddress = COMMON_TOKENS[symbol as keyof typeof COMMON_TOKENS];
               const erc20 = getERC20Contract(tokenAddress);
-              const decimals = await erc20.decimals();
+              const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
               return {
                 address: tokenAddress,
                 symbol: symbol,
@@ -345,10 +373,13 @@ export const useVault = () => {
                 decimals: decimals,
               };
             } catch (tokenError) {
-              console.log(`🔍 getVaultInfo: Error getting info for ${symbol}:`, tokenError);
+              console.log(
+                `🔍 getVaultInfo: Error getting info for token ${tokenAddress}:`,
+                tokenError
+              );
               return {
-                address: COMMON_TOKENS[symbol as keyof typeof COMMON_TOKENS],
-                symbol: symbol,
+                address: tokenAddress,
+                symbol: 'UNK',
                 balance: '0',
                 decimals: 18,
               };
@@ -366,42 +397,232 @@ export const useVault = () => {
           tokenCount: tokenCount.toNumber(),
         };
         console.log('🔍 getVaultInfo: Final result:', result);
+
+        // Auto-register common tokens in background (don't wait for it)
+
+        autoRegisterCommonTokens(vaultAddress).catch((error) => {
+          console.warn('⚠️ Background auto-registration failed:', error);
+        });
+
         return result;
       } catch (err) {
         console.error('❌ Error getting vault info:', err);
         throw err;
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [getUserVault, getERC20Contract, vincentProvider]
   );
 
-  // Withdraw tokens from vault (requires Vincent Ability)
+  // Withdraw tokens from vault using Vincent EVM Transaction Signer Ability
   const withdraw = useCallback(
     async (
-      _vaultAddress: string, // eslint-disable-line @typescript-eslint/no-unused-vars
-      _tokenAddress: string, // eslint-disable-line @typescript-eslint/no-unused-vars
-      _amount: string // eslint-disable-line @typescript-eslint/no-unused-vars
+      vaultAddress: string,
+      tokenAddress: string,
+      amount: string,
+      recipientAddress: string
     ): Promise<void> => {
-      if (!authInfo?.pkp.ethAddress) throw new Error('No Vincent wallet connected');
+      if (!authInfo?.pkp.ethAddress) {
+        throw new Error('No Vincent PKP wallet connected');
+      }
+
+      if (!authInfo?.jwt) {
+        throw new Error('No Vincent JWT available. Please re-authenticate.');
+      }
+
+      if (!env.VITE_DELEGATEE_PRIVATE_KEY) {
+        throw new Error(
+          'Delegatee private key not configured. Please add VITE_DELEGATEE_PRIVATE_KEY to your .env file'
+        );
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        // TODO: Implement Vincent Ability for token withdrawal
-        const message =
-          'Token withdrawal requires Vincent Abilities. This will be implemented with Vincent SDK.';
-        setError(message);
-        alert(message);
-        throw new Error(message);
+        console.log('🔍 ===== WITHDRAW TRANSACTION DEBUG INFO =====');
+        console.log('🔍 Withdrawing tokens with Vincent PKP wallet:', authInfo.pkp.ethAddress);
+        console.log('🔍 Vault address:', vaultAddress);
+        console.log('🔍 Token address:', tokenAddress);
+        console.log('🔍 Amount (wei):', amount);
+        console.log('🔍 Recipient address:', recipientAddress);
+        console.log('🔍 ===========================================');
+
+        // Create Vincent signer with EVM Transaction Signer Ability
+        const vincentSigner = new VincentSigner(
+          'https://sepolia.base.org', // Base Sepolia RPC
+          authInfo.pkp.ethAddress,
+          env.VITE_DELEGATEE_PRIVATE_KEY,
+          authInfo.jwt
+        );
+
+        // Create vault contract instance with Vincent signer
+        const vault = vincentSigner.createContract(vaultAddress, USER_VAULT_ABI);
+
+        // Send withdraw transaction using Vincent PKP with EVM Transaction Signer Ability
+        console.log('🔍 Sending withdrawTo transaction with Vincent PKP...');
+        const tx = await vincentSigner.sendContractTransaction(
+          vault,
+          'withdrawTo',
+          tokenAddress,
+          amount,
+          recipientAddress
+        );
+        console.log('🔍 Withdraw transaction sent:', tx.hash);
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log('🔍 Withdraw transaction confirmed:', receipt);
+
+        // Parse the TokensWithdrawn event to verify the withdrawal
+        const tokensWithdrawnEvent = receipt.logs.find((log: ethers.providers.Log) => {
+          try {
+            const parsed = vault.interface.parseLog(log);
+            return parsed?.name === 'TokensWithdrawn';
+          } catch {
+            return false;
+          }
+        });
+
+        if (tokensWithdrawnEvent) {
+          const parsedEvent = vault.interface.parseLog(tokensWithdrawnEvent);
+          console.log('✅ TokensWithdrawn event found:', parsedEvent?.args);
+        }
+
+        console.log('✅ Tokens withdrawn successfully with Vincent PKP');
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to withdraw tokens';
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to withdraw tokens with Vincent PKP';
+        console.error('❌ Error withdrawing tokens with Vincent PKP:', err);
         setError(errorMessage);
         throw new Error(errorMessage);
       } finally {
         setLoading(false);
       }
     },
-    [authInfo?.pkp.ethAddress]
+    [authInfo?.pkp.ethAddress, authInfo?.jwt]
+  );
+
+  // Register existing tokens in vault (requires Vincent Ability)
+  const registerExistingTokens = useCallback(
+    async (vaultAddress: string, tokenAddresses: string[]): Promise<void> => {
+      if (!authInfo?.pkp.ethAddress) {
+        throw new Error('No Vincent PKP wallet connected');
+      }
+
+      if (!authInfo?.jwt) {
+        throw new Error('No Vincent JWT available. Please re-authenticate.');
+      }
+
+      if (!env.VITE_DELEGATEE_PRIVATE_KEY) {
+        throw new Error(
+          'Delegatee private key not configured. Please add VITE_DELEGATEE_PRIVATE_KEY to your .env file'
+        );
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log('🔍 ===== REGISTER TOKENS TRANSACTION DEBUG INFO =====');
+        console.log('🔍 Registering tokens with Vincent PKP wallet:', authInfo.pkp.ethAddress);
+        console.log('🔍 Vault address:', vaultAddress);
+        console.log('🔍 Token addresses:', tokenAddresses);
+        console.log('🔍 ================================================');
+
+        // Create Vincent signer with EVM Transaction Signer Ability
+        const vincentSigner = new VincentSigner(
+          'https://sepolia.base.org', // Base Sepolia RPC
+          authInfo.pkp.ethAddress,
+          env.VITE_DELEGATEE_PRIVATE_KEY,
+          authInfo.jwt
+        );
+
+        // Create vault contract instance with Vincent signer
+        const vault = vincentSigner.createContract(vaultAddress, USER_VAULT_ABI);
+
+        // Send registerExistingTokens transaction using Vincent PKP with EVM Transaction Signer Ability
+        console.log('🔍 Sending registerExistingTokens transaction with Vincent PKP...');
+        const tx = await vincentSigner.sendContractTransaction(
+          vault,
+          'registerExistingTokens',
+          tokenAddresses
+        );
+        console.log('🔍 Register tokens transaction sent:', tx.hash);
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log('🔍 Register tokens transaction confirmed:', receipt);
+
+        console.log('✅ Tokens registered successfully with Vincent PKP');
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to register tokens with Vincent PKP';
+        console.error('❌ Error registering tokens with Vincent PKP:', err);
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authInfo?.pkp.ethAddress, authInfo?.jwt]
+  );
+
+  // Auto-register common tokens if they exist in vault but aren't registered
+  const autoRegisterCommonTokens = useCallback(
+    async (vaultAddress: string): Promise<void> => {
+      if (!vincentProvider || !authInfo?.pkp.ethAddress || !authInfo?.jwt) {
+        return;
+      }
+
+      try {
+        console.log('🔍 Auto-checking for unregistered common tokens...');
+
+        // Check if common tokens exist in vault but aren't registered
+        const commonTokens = [COMMON_TOKENS.WETH, COMMON_TOKENS.USDC];
+        const tokensToRegister: string[] = [];
+
+        for (const tokenAddress of commonTokens) {
+          try {
+            // Check if token has balance in vault
+            const tokenContract = new ethers.Contract(
+              tokenAddress,
+              ['function balanceOf(address owner) view returns (uint256)'],
+              vincentProvider
+            );
+            const balance = await tokenContract.balanceOf(vaultAddress);
+
+            if (balance.gt(0)) {
+              // Check if token is already registered
+              const vaultContract = new ethers.Contract(
+                vaultAddress,
+                ['function getSupportedTokens() external view returns (address[] memory)'],
+                vincentProvider
+              );
+              const supportedTokens = await vaultContract.getSupportedTokens();
+
+              if (!supportedTokens.includes(tokenAddress)) {
+                tokensToRegister.push(tokenAddress);
+                console.log('🔍 Found unregistered token with balance:', tokenAddress);
+              }
+            }
+          } catch (tokenError) {
+            console.warn('⚠️ Error checking token:', tokenAddress, tokenError);
+          }
+        }
+
+        // Register tokens that have balances but aren't registered
+        if (tokensToRegister.length > 0) {
+          console.log('🔍 Auto-registering tokens with balances:', tokensToRegister);
+          await registerExistingTokens(vaultAddress, tokensToRegister);
+          console.log('✅ Auto-registered tokens with balances');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to auto-register common tokens:', error);
+        // Don't throw - this is a background operation
+      }
+    },
+    [vincentProvider, authInfo?.pkp.ethAddress, authInfo?.jwt, registerExistingTokens]
   );
 
   return {
@@ -413,5 +634,6 @@ export const useVault = () => {
     getVaultInfo,
     getTokenInfo,
     withdraw,
+    registerExistingTokens,
   };
 };

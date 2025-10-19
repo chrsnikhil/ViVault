@@ -47,7 +47,7 @@ _(Base Sepolia Testnet)_
    - **Vincent Policies** they need to configure (Contract Whitelist)
 4. They must add to the whitelist:
    - **Chain ID**: `84532`
-   - **Contract Address**: `0xC512f4A21882079C3598BDDBa994a173349123BA`
+   - **Contract Address**: `0xF68D5b37407809Ed208e73e9Ced8a0fbbb3CdABE`
    - **Function**: `0x5d12928b` (or `*` for all functions)
 5. After approval, they're redirected back with a JWT
 

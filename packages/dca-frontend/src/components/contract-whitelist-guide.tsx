@@ -9,7 +9,7 @@ const WHITELIST_CONFIG = {
   chainName: 'Base Sepolia',
   contracts: [
     {
-      address: '0xC512f4A21882079C3598BDDBa994a173349123BA',
+      address: '0xF68D5b37407809Ed208e73e9Ced8a0fbbb3CdABE',
       name: 'VaultFactory',
       functionSelector: '0x5d12928b',
       functionName: 'createVault()',

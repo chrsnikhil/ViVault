@@ -43,6 +43,7 @@ export interface UserVaultInterface extends Interface {
       | 'transferOwnership'
       | 'withdraw'
       | 'withdrawAll'
+      | 'withdrawTo'
   ): FunctionFragment;
 
   getEvent(
@@ -71,6 +72,10 @@ export interface UserVaultInterface extends Interface {
   encodeFunctionData(functionFragment: 'transferOwnership', values: [AddressLike]): string;
   encodeFunctionData(functionFragment: 'withdraw', values: [AddressLike, BigNumberish]): string;
   encodeFunctionData(functionFragment: 'withdrawAll', values: [AddressLike]): string;
+  encodeFunctionData(
+    functionFragment: 'withdrawTo',
+    values: [AddressLike, BigNumberish, AddressLike]
+  ): string;
 
   decodeFunctionResult(functionFragment: 'deposit', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'factory', data: BytesLike): Result;
@@ -89,6 +94,7 @@ export interface UserVaultInterface extends Interface {
   decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'withdraw', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'withdrawAll', data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: 'withdrawTo', data: BytesLike): Result;
 }
 
 export namespace OwnershipTransferredEvent {
@@ -256,6 +262,12 @@ export interface UserVault extends BaseContract {
 
   withdrawAll: TypedContractMethod<[token: AddressLike], [void], 'nonpayable'>;
 
+  withdrawTo: TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish, to: AddressLike],
+    [void],
+    'nonpayable'
+  >;
+
   getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
   getFunction(
@@ -270,7 +282,9 @@ export interface UserVault extends BaseContract {
   ): TypedContractMethod<[tokens: AddressLike[]], [bigint[]], 'view'>;
   getFunction(nameOrSignature: 'getSupportedTokenCount'): TypedContractMethod<[], [bigint], 'view'>;
   getFunction(nameOrSignature: 'getSupportedTokens'): TypedContractMethod<[], [string[]], 'view'>;
-  getFunction(nameOrSignature: 'getVaultInfo'): TypedContractMethod<
+  getFunction(
+    nameOrSignature: 'getVaultInfo'
+  ): TypedContractMethod<
     [],
     [
       [string, string, bigint, bigint] & {
@@ -308,6 +322,13 @@ export interface UserVault extends BaseContract {
   getFunction(
     nameOrSignature: 'withdrawAll'
   ): TypedContractMethod<[token: AddressLike], [void], 'nonpayable'>;
+  getFunction(
+    nameOrSignature: 'withdrawTo'
+  ): TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish, to: AddressLike],
+    [void],
+    'nonpayable'
+  >;
 
   getEvent(
     key: 'OwnershipTransferred'

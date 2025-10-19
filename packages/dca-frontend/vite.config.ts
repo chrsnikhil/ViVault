@@ -49,14 +49,25 @@ export default defineConfig(({ command, mode }) => {
     ],
     define: {
       global: 'globalThis',
+      'process.env': {},
+      'process.browser': true,
+      'process.version': '"v16.0.0"',
+      'process.platform': '"browser"',
+      'process.nextTick': 'setTimeout',
+      Browser: 'undefined', // Fix for brotli package
     },
     optimizeDeps: {
-      include: ['@lit-protocol/vincent-app-sdk/jwt', '@lit-protocol/vincent-app-sdk/webAuthClient'], // Dev: delete node_modules/.vite when rebuilding this
+      include: [
+        '@lit-protocol/vincent-app-sdk/jwt',
+        '@lit-protocol/vincent-app-sdk/webAuthClient',
+        '@lit-protocol/vincent-ability-uniswap-swap',
+        'buffer',
+      ], // Dev: delete node_modules/.vite when rebuilding this
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
-        buffer: 'buffer/',
+        brotli: path.resolve(__dirname, './src/lib/brotli-mock.js'), // Mock brotli for browser
       },
     },
     build: {

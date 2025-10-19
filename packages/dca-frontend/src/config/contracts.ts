@@ -2,15 +2,15 @@
 
 // Deployed VaultFactory address on Base Sepolia
 export const CONTRACT_ADDRESSES = {
-  VaultFactory: '0xC512f4A21882079C3598BDDBa994a173349123BA', // Updated VaultFactory with balance tracking fix
+  VaultFactory: '0xF68D5b37407809Ed208e73e9Ced8a0fbbb3CdABE', // Updated VaultFactory with withdrawTo function
 };
 
 // Common ERC20 token addresses on Base Sepolia
 export const COMMON_TOKENS = {
-  WETH: '0x24fe7807089e321395172633aA9c4bBa4Ac4a357', // WETH on Base Sepolia (corrected)
-  USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
-  DAI: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed', // DAI on Base Sepolia
-  // Note: USDT and WBTC addresses removed due to checksum/contract issues
+  WETH: '0x4200000000000000000000000000000000000006', // WETH on Base Sepolia (official address)
+  USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC-Circle on Base Sepolia (has Uniswap pools)
+  USDC_OLD: '0x8a04d904055528a69f3e4594dda308a31aeb8457', // Old USDC Testnet (no pools)
+  // Note: USDC-Circle has actual Uniswap V3 liquidity on Base Sepolia
 };
 
 // Minimal ABI for VaultFactory
@@ -29,6 +29,7 @@ export const USER_VAULT_ABI = [
   'function factory() external view returns (address)',
   'function deposit(address token, uint256 amount) external',
   'function withdraw(address token, uint256 amount) external',
+  'function withdrawTo(address token, uint256 amount, address to) external',
   'function withdrawAll(address token) external',
   'function getBalance(address token) external view returns (uint256)',
   'function getBalances(address[] calldata tokens) external view returns (uint256[] memory)',

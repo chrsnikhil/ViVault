@@ -94,6 +94,27 @@ contract UserVault is Ownable, ReentrancyGuard {
     }
     
     /**
+     * @dev Withdraws ERC-20 tokens from the vault to a specific address
+     * @param token The ERC-20 token contract address
+     * @param amount The amount of tokens to withdraw
+     * @param to The address to send tokens to
+     */
+    function withdrawTo(address token, uint256 amount, address to) external onlyOwner nonReentrant {
+        require(token != address(0), "UserVault: Invalid token address");
+        require(amount > 0, "UserVault: Amount must be greater than 0");
+        require(to != address(0), "UserVault: Invalid recipient address");
+        require(tokenBalances[token] >= amount, "UserVault: Insufficient vault balance");
+        
+        // Update vault balance
+        tokenBalances[token] -= amount;
+        
+        // Transfer tokens to specified address
+        IERC20(token).safeTransfer(to, amount);
+        
+        emit TokensWithdrawn(token, amount, to, block.timestamp);
+    }
+    
+    /**
      * @dev Withdraws all tokens of a specific type
      * @param token The ERC-20 token contract address
      */
