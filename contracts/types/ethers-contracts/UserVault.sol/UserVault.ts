@@ -35,6 +35,7 @@ export interface UserVaultInterface extends Interface {
       | 'getVaultInfo'
       | 'isTokenSupported'
       | 'owner'
+      | 'registerExistingTokens'
       | 'removeToken'
       | 'renounceOwnership'
       | 'supportedTokens'
@@ -62,6 +63,7 @@ export interface UserVaultInterface extends Interface {
   encodeFunctionData(functionFragment: 'getVaultInfo', values?: undefined): string;
   encodeFunctionData(functionFragment: 'isTokenSupported', values: [AddressLike]): string;
   encodeFunctionData(functionFragment: 'owner', values?: undefined): string;
+  encodeFunctionData(functionFragment: 'registerExistingTokens', values: [AddressLike[]]): string;
   encodeFunctionData(functionFragment: 'removeToken', values: [AddressLike]): string;
   encodeFunctionData(functionFragment: 'renounceOwnership', values?: undefined): string;
   encodeFunctionData(functionFragment: 'supportedTokens', values: [BigNumberish]): string;
@@ -79,6 +81,7 @@ export interface UserVaultInterface extends Interface {
   decodeFunctionResult(functionFragment: 'getVaultInfo', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'isTokenSupported', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: 'registerExistingTokens', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'removeToken', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'renounceOwnership', data: BytesLike): Result;
   decodeFunctionResult(functionFragment: 'supportedTokens', data: BytesLike): Result;
@@ -237,6 +240,8 @@ export interface UserVault extends BaseContract {
 
   owner: TypedContractMethod<[], [string], 'view'>;
 
+  registerExistingTokens: TypedContractMethod<[tokens: AddressLike[]], [void], 'nonpayable'>;
+
   removeToken: TypedContractMethod<[token: AddressLike], [void], 'nonpayable'>;
 
   renounceOwnership: TypedContractMethod<[], [void], 'nonpayable'>;
@@ -265,9 +270,7 @@ export interface UserVault extends BaseContract {
   ): TypedContractMethod<[tokens: AddressLike[]], [bigint[]], 'view'>;
   getFunction(nameOrSignature: 'getSupportedTokenCount'): TypedContractMethod<[], [bigint], 'view'>;
   getFunction(nameOrSignature: 'getSupportedTokens'): TypedContractMethod<[], [string[]], 'view'>;
-  getFunction(
-    nameOrSignature: 'getVaultInfo'
-  ): TypedContractMethod<
+  getFunction(nameOrSignature: 'getVaultInfo'): TypedContractMethod<
     [],
     [
       [string, string, bigint, bigint] & {
@@ -283,6 +286,9 @@ export interface UserVault extends BaseContract {
     nameOrSignature: 'isTokenSupported'
   ): TypedContractMethod<[arg0: AddressLike], [boolean], 'view'>;
   getFunction(nameOrSignature: 'owner'): TypedContractMethod<[], [string], 'view'>;
+  getFunction(
+    nameOrSignature: 'registerExistingTokens'
+  ): TypedContractMethod<[tokens: AddressLike[]], [void], 'nonpayable'>;
   getFunction(
     nameOrSignature: 'removeToken'
   ): TypedContractMethod<[token: AddressLike], [void], 'nonpayable'>;

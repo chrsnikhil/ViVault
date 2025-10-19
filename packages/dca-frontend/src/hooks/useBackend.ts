@@ -12,11 +12,6 @@ export const useBackend = () => {
   const { authInfo } = useJwtContext();
   const vincentWebAuthClient = useVincentWebAuthClient(VITE_APP_ID);
 
-  // Debug: Log authentication state
-  console.log('useBackend - authInfo:', authInfo);
-  console.log('useBackend - VITE_APP_ID:', VITE_APP_ID);
-  console.log('useBackend - VITE_REDIRECT_URI:', VITE_REDIRECT_URI);
-
   const getJwt = useCallback(() => {
     try {
       console.log('Starting Vincent authentication...', {

@@ -27,7 +27,7 @@ export const Presentation: React.FC = () => {
   };
 
   return (
-    <Card data-testId="presentation" className="w-full md:max-w-md bg-white p-8 shadow-sm">
+    <Card data-testid="presentation" className="w-full md:max-w-md bg-white p-8 shadow-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">MicroLend</CardTitle>
         <CardDescription className="text-gray-600">

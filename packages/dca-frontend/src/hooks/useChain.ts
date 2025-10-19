@@ -10,7 +10,7 @@ const BASE_SEPOLIA_CHAIN_ID = 84532;
 // Base Sepolia testnet contract addresses
 // Using ETH and WETH (Wrapped ETH) for testing
 const WETH_CONTRACT_ADDRESSES: Record<number, string> = {
-  [BASE_SEPOLIA_CHAIN_ID]: '0x4200000000000000000000000000000000000006', // WETH on Base Sepolia
+  [BASE_SEPOLIA_CHAIN_ID]: '0x24fe7807089e321395172633aA9c4bBa4Ac4a357', // WETH on Base Sepolia (corrected)
 };
 
 const USDC_CONTRACT_ADDRESSES: Record<number, string> = {

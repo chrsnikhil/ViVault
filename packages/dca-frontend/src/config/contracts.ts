@@ -2,13 +2,15 @@
 
 // Deployed VaultFactory address on Base Sepolia
 export const CONTRACT_ADDRESSES = {
-  VaultFactory: '0x2e2bb24b2B88F30ea7dB6DFD8b9DAeC87b563b1C', // Deployed to Base Sepolia
+  VaultFactory: '0xC512f4A21882079C3598BDDBa994a173349123BA', // Updated VaultFactory with balance tracking fix
 };
 
 // Common ERC20 token addresses on Base Sepolia
 export const COMMON_TOKENS = {
-  USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Example USDC address on Base Sepolia
-  WETH: '0x4200000000000000000000000000000000000006', // WETH on Base Sepolia
+  WETH: '0x24fe7807089e321395172633aA9c4bBa4Ac4a357', // WETH on Base Sepolia (corrected)
+  USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
+  DAI: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed', // DAI on Base Sepolia
+  // Note: USDT and WBTC addresses removed due to checksum/contract issues
 };
 
 // Minimal ABI for VaultFactory
@@ -33,6 +35,7 @@ export const USER_VAULT_ABI = [
   'function getSupportedTokens() external view returns (address[] memory)',
   'function getSupportedTokenCount() external view returns (uint256)',
   'function getVaultInfo() external view returns (address ownerAddress, address factoryAddress, uint256 tokenCount, uint256 totalValue)',
+  'function registerExistingTokens(address[] calldata tokens) external',
   'event TokensReceived(address indexed token, uint256 amount, address indexed from, uint256 timestamp)',
   'event TokensWithdrawn(address indexed token, uint256 amount, address indexed to, uint256 timestamp)',
   'event TokenAdded(address indexed token, uint256 timestamp)',

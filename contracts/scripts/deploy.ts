@@ -30,9 +30,9 @@ async function main() {
   const vaultFactoryAddress = await vaultFactory.getAddress();
   console.log('✅ VaultFactory deployed to:', vaultFactoryAddress);
 
-  // Verify deployment
-  const owner = await vaultFactory.owner();
-  console.log('🔍 VaultFactory owner:', owner);
+  // Wait a bit for the deployment to be confirmed
+  console.log('🔍 Waiting for deployment confirmation...');
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
   console.log('🎉 Deployment completed successfully!');
   console.log('📋 Contract Addresses:');

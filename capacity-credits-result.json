@@ -1,0 +1,20 @@
+{
+  "capacityTokenId": {
+    "type": "BigNumber",
+    "hex": "0x0487fe"
+  },
+  "capacityTokenIdStr": "296958",
+  "rliTxHash": "0x01b5d65e08fb715bac24d5aad56168040dd56926cfed94de0e639487b639bdcc",
+  "pkpAddress": "0x6C9F98489B77a175B250C514a27D27642DaF8092",
+  "delegationAuthSig": {
+    "sig": "0xfd2b40b2558592c103e4198f4005313d98b09f61dba2f461f29215c81af8d9fb5dbbfb4f5ba20ca286377228d2731d3f70a36b30194d50079a2c0d34b9ad5d9c1c",
+    "derivedVia": "web3.eth.personal.sign",
+    "signedMessage": "localhost wants you to sign in with your Ethereum account:\n0x34eA823003c198D2D3F0799821B3A85E7f256828\n\nThis is a test statement.  You can put anything you want here. I further authorize the stated URI to perform the following actions on my behalf: (1) 'Auth': 'Auth' for 'lit-ratelimitincrease://296958'.\n\nURI: lit:capability:delegation\nVersion: 1\nChain ID: 1\nNonce: 0xb1de33751203f08f12166c55807dbacc46037a5303f4c1ee693afe0581f39060\nIssued At: 2025-10-17T12:18:51.307Z\nExpiration Time: 2025-10-24T12:18:51.304Z\nResources:\n- urn:recap:eyJhdHQiOnsibGl0LXJhdGVsaW1pdGluY3JlYXNlOi8vMjk2OTU4Ijp7IkF1dGgvQXV0aCI6W3siZGVsZWdhdGVfdG8iOlsiNkM5Rjk4NDg5Qjc3YTE3NUIyNTBDNTE0YTI3RDI3NjQyRGFGODA5MiJdLCJuZnRfaWQiOlsiMjk2OTU4Il0sInVzZXMiOiIxMCJ9XX19LCJwcmYiOltdfQ",
+    "address": "0x34eA823003c198D2D3F0799821B3A85E7f256828"
+  },
+  "network": "Chronicle Yellowstone (DatilTest)",
+  "currency": "tstLPX",
+  "uses": 10,
+  "expirationDays": 7,
+  "timestamp": "2025-10-17T12:18:51.312Z"
+}

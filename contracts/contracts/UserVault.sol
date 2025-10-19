@@ -114,21 +114,23 @@ contract UserVault is Ownable, ReentrancyGuard {
     /**
      * @dev Gets the balance of a specific token in the vault
      * @param token The ERC-20 token contract address
-     * @return balance The token balance in the vault
+     * @return balance The actual token balance in the vault
      */
     function getBalance(address token) external view returns (uint256) {
-        return tokenBalances[token];
+        // Return the actual token balance instead of just the internal tracking
+        return IERC20(token).balanceOf(address(this));
     }
     
     /**
      * @dev Gets balances of multiple tokens
      * @param tokens Array of token addresses
-     * @return balances Array of corresponding balances
+     * @return balances Array of corresponding actual balances
      */
     function getBalances(address[] calldata tokens) external view returns (uint256[] memory) {
         uint256[] memory balances = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
-            balances[i] = tokenBalances[tokens[i]];
+            // Return the actual token balance instead of just the internal tracking
+            balances[i] = IERC20(tokens[i]).balanceOf(address(this));
         }
         return balances;
     }
@@ -139,6 +141,27 @@ contract UserVault is Ownable, ReentrancyGuard {
      */
     function getSupportedTokens() external view returns (address[] memory) {
         return supportedTokens;
+    }
+    
+    /**
+     * @dev Automatically registers tokens that have balances but aren't in supported tokens
+     * This allows the vault to track tokens that were sent directly
+     */
+    function registerExistingTokens(address[] calldata tokens) external onlyOwner {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
+            if (token != address(0) && !isTokenSupported[token]) {
+                // Check if the token actually has a balance
+                uint256 balance = IERC20(token).balanceOf(address(this));
+                if (balance > 0) {
+                    supportedTokens.push(token);
+                    isTokenSupported[token] = true;
+                    // Update internal tracking to match actual balance
+                    tokenBalances[token] = balance;
+                    emit TokenAdded(token, block.timestamp);
+                }
+            }
+        }
     }
     
     /**

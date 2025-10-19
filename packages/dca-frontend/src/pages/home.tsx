@@ -8,6 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ComponentGallery from '@/components/component-gallery';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { VaultManager } from '@/components/vault-manager';
+import { PrivyWalletConnector } from '@/components/privy-wallet-connector';
+import { EthTransfer } from '@/components/eth-transfer';
 import { Menu, X, ArrowRight, CheckCircle, Clock, DollarSign, WalletIcon } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -298,6 +301,50 @@ export const Home: React.FC = () => {
                 </CardContent>
               </Card>
             </motion.div>
+          </motion.div>
+        </section>
+
+        {/* Wallet Connection */}
+        <section className="mx-auto max-w-7xl px-6 pb-20">
+          <motion.div className="mb-8" variants={fadeInUp}>
+            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
+              Connect Your Wallets
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl">
+              Connect multiple wallets to manage your vault operations with flexibility.
+            </p>
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <PrivyWalletConnector />
+          </motion.div>
+        </section>
+
+        {/* Vault Manager */}
+        <section className="mx-auto max-w-7xl px-6 pb-20">
+          <motion.div className="mb-8" variants={fadeInUp}>
+            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
+              ViVault Manager
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl">
+              Manage your volatility-based portfolio vault with advanced strategies.
+            </p>
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <VaultManager />
+          </motion.div>
+        </section>
+
+        {/* WETH Transfer */}
+        <section className="mx-auto max-w-7xl px-6 pb-20">
+          <motion.div className="mb-8" variants={fadeInUp}>
+            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">Send WETH</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl">
+              Transfer WETH tokens from your Vincent Wallet using the official Vincent ERC20
+              Transfer Ability.
+            </p>
+          </motion.div>
+          <motion.div variants={fadeInUp} className="max-w-2xl">
+            <EthTransfer />
           </motion.div>
         </section>
 

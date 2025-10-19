@@ -7,8 +7,21 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ command, mode }) => {
   const isBuild = command === 'build';
 
-  // Load env file based on `mode` in the current working directory.
+  // Load env file based on `mode` in the current directory
   const env = loadEnv(mode, process.cwd(), '');
+
+  // Debug: Log directory and mode
+  console.log('🔍 Vite Config - Current working directory:', process.cwd());
+  console.log('🔍 Vite Config - Mode:', mode);
+  console.log(
+    '🔍 Vite Config - Loaded env variables:',
+    Object.keys(env).filter((key) => key.startsWith('VITE_'))
+  );
+  console.log('🔍 Vite Config - VITE_APP_ID:', env.VITE_APP_ID);
+  console.log(
+    '🔍 Vite Config - VITE_DELEGATEE_PRIVATE_KEY:',
+    env.VITE_DELEGATEE_PRIVATE_KEY ? '***exists***' : 'undefined'
+  );
 
   const sentryEnabled =
     isBuild &&
@@ -36,12 +49,6 @@ export default defineConfig(({ command, mode }) => {
     ],
     define: {
       global: 'globalThis',
-      // Explicitly define environment variables
-      'import.meta.env.VITE_APP_ID': JSON.stringify(env.VITE_APP_ID),
-      'import.meta.env.VITE_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL),
-      'import.meta.env.VITE_EXPECTED_AUDIENCE': JSON.stringify(env.VITE_EXPECTED_AUDIENCE),
-      'import.meta.env.VITE_IS_DEVELOPMENT': JSON.stringify(env.VITE_IS_DEVELOPMENT),
-      'import.meta.env.VITE_REDIRECT_URI': JSON.stringify(env.VITE_REDIRECT_URI),
     },
     optimizeDeps: {
       include: ['@lit-protocol/vincent-app-sdk/jwt', '@lit-protocol/vincent-app-sdk/webAuthClient'], // Dev: delete node_modules/.vite when rebuilding this
