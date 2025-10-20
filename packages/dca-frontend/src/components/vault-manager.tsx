@@ -225,26 +225,35 @@ export const VaultManager: React.FC = () => {
         await registerExistingTokens(vaultInfo.address, tokensToRegister);
 
         // Refresh vault info to show the newly registered tokens
-        await refreshVaultStatus();
+        // We'll call refreshVaultStatusFull directly instead of including it in dependencies
+        try {
+          const hasVaultResult = await hasVault();
+          setUserHasVault(hasVaultResult);
+
+          if (hasVaultResult) {
+            const address = await getVaultAddress();
+            setVaultAddress(address);
+
+            if (address) {
+              const info = await getVaultInfo(address);
+              setVaultInfo(info);
+            }
+          }
+        } catch (err) {
+          console.error('❌ Error refreshing vault status:', err);
+        }
       }
     } catch (error) {
       console.error('❌ Auto-registration failed:', error);
     }
-  }, [vaultInfo?.address, registerExistingTokens, vincentProvider, refreshVaultStatus]);
-
-  // Refresh vault status
-  const refreshVaultStatus = useCallback(async () => {
-    if (!vaultAddress) return;
-    try {
-      setLoading(true);
-      const info = await getVaultInfo(vaultAddress);
-      setVaultInfo(info);
-    } catch (error) {
-      console.error('Failed to refresh vault status:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [vaultAddress, getVaultInfo]);
+  }, [
+    vaultInfo?.address,
+    registerExistingTokens,
+    vincentProvider,
+    hasVault,
+    getVaultAddress,
+    getVaultInfo,
+  ]);
 
   // Utility functions
   const formatAddress = (address: string): string => {
@@ -262,7 +271,7 @@ export const VaultManager: React.FC = () => {
   };
 
   // Vault operations
-  const refreshVaultStatus = async () => {
+  const refreshVaultStatusFull = useCallback(async () => {
     try {
       const hasVaultResult = await hasVault();
       setUserHasVault(hasVaultResult);
@@ -279,12 +288,12 @@ export const VaultManager: React.FC = () => {
     } catch (err) {
       console.error('❌ Error refreshing vault status:', err);
     }
-  };
+  }, [hasVault, getVaultAddress, getVaultInfo]);
 
   const handleCreateVault = async () => {
     try {
       await createVaultWithVincent();
-      await refreshVaultStatus();
+      await refreshVaultStatusFull();
     } catch (err) {
       console.error('❌ Error creating vault:', err);
     }
@@ -306,7 +315,7 @@ export const VaultManager: React.FC = () => {
         throw new Error('No vault address or token selected');
 
       await withdraw(vaultAddress, selectedTokenForWithdraw.address, amount, recipientAddress);
-      await refreshVaultStatus();
+      await refreshVaultStatusFull();
     } catch (err) {
       console.error('❌ Error withdrawing:', err);
       throw err;
@@ -315,8 +324,8 @@ export const VaultManager: React.FC = () => {
 
   // Initialize vault status
   useEffect(() => {
-    refreshVaultStatus();
-  }, [vincentAccount, refreshVaultStatus]);
+    refreshVaultStatusFull();
+  }, [vincentAccount, refreshVaultStatusFull]);
 
   // Network check
   if (chainId !== 84532) {
@@ -465,7 +474,7 @@ export const VaultManager: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={refreshVaultStatus}
+                  onClick={refreshVaultStatusFull}
                   disabled={loading}
                   className="flex items-center gap-2"
                 >
@@ -625,7 +634,7 @@ export const VaultManager: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={refreshVaultStatus}
+                          onClick={refreshVaultStatusFull}
                           disabled={loading}
                           className="w-full"
                         >
