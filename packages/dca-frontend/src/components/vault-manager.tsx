@@ -13,6 +13,10 @@ import {
   RefreshCw,
   ArrowUpDown,
   TrendingUp,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  List,
 } from 'lucide-react';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 import { Pie } from 'react-chartjs-2';
@@ -28,6 +32,14 @@ import { ethers } from 'ethers';
 import { PriceCalculator, type TokenValue } from '@/lib/price-calculator';
 import { WithdrawPopup } from '@/components/withdraw-popup';
 import { SwapPopup } from '@/components/swap-popup';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 export const VaultManager: React.FC = () => {
   ChartJS.register(ArcElement, ChartTooltipJS, ChartLegendJS);
@@ -44,6 +56,9 @@ export const VaultManager: React.FC = () => {
     decimals: number;
   } | null>(null);
   const [swapPopupOpen, setSwapPopupOpen] = useState(false);
+  const [showAllTokens, setShowAllTokens] = useState(false);
+  const [tokenListPopupOpen, setTokenListPopupOpen] = useState(false);
+  const [tokenSearchQuery, setTokenSearchQuery] = useState('');
 
   // Local price calculator and computed vault value
   const [priceCalculator] = useState(() => new PriceCalculator());
@@ -260,6 +275,16 @@ export const VaultManager: React.FC = () => {
     if (!address) return 'N/A';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  // Filter tokens based on search query
+  const filteredTokens =
+    vaultInfo?.balances?.filter((token) => {
+      if (!tokenSearchQuery) return true;
+      const query = tokenSearchQuery.toLowerCase();
+      return (
+        token.symbol.toLowerCase().includes(query) || token.address.toLowerCase().includes(query)
+      );
+    }) || [];
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -689,50 +714,178 @@ export const VaultManager: React.FC = () => {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Token Holdings</h2>
-                    <Badge variant="outline">{vaultInfo.balances.length} tokens</Badge>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline">{vaultInfo.balances.length} tokens</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTokenListPopupOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <List className="size-4" />
+                        View All
+                      </Button>
+                      {vaultInfo.balances.length > 6 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAllTokens(!showAllTokens)}
+                          className="flex items-center gap-2"
+                        >
+                          {showAllTokens ? (
+                            <>
+                              <ChevronUp className="size-4" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="size-4" />
+                              Show All
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vaultInfo.balances.map((balance) => (
-                      <Card key={balance.address} className="border-2 overflow-hidden rounded-xl">
-                        <CardContent className="space-y-2">
-                          <div className="text-base font-semibold">{balance.symbol}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {ethers.utils.formatUnits(balance.balance, balance.decimals)}{' '}
-                            {balance.symbol}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                handleWithdrawClick({
-                                  address: balance.address,
-                                  symbol: balance.symbol,
-                                  balance: ethers.utils.formatUnits(
-                                    balance.balance,
-                                    balance.decimals
-                                  ),
-                                  decimals: balance.decimals,
-                                });
-                              }}
-                              className="flex-1"
-                            >
-                              Withdraw
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSwapPopupOpen(true)}
-                              className="flex-1"
-                            >
-                              Swap
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                  {/* Compact Token List (when collapsed or few tokens) */}
+                  {!showAllTokens && vaultInfo.balances.length <= 6 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {vaultInfo.balances.map((balance) => (
+                        <Card key={balance.address} className="border-2 overflow-hidden rounded-xl">
+                          <CardContent className="space-y-2">
+                            <div className="text-base font-semibold">{balance.symbol}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {ethers.utils.formatUnits(balance.balance, balance.decimals)}{' '}
+                              {balance.symbol}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  handleWithdrawClick({
+                                    address: balance.address,
+                                    symbol: balance.symbol,
+                                    balance: ethers.utils.formatUnits(
+                                      balance.balance,
+                                      balance.decimals
+                                    ),
+                                    decimals: balance.decimals,
+                                  });
+                                }}
+                                className="flex-1"
+                              >
+                                Withdraw
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSwapPopupOpen(true)}
+                                className="flex-1"
+                              >
+                                Swap
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Compact Token List (when expanded) */}
+                  {showAllTokens && vaultInfo.balances.length > 6 && (
+                    <div className="space-y-3">
+                      {vaultInfo.balances.map((balance) => (
+                        <Card key={balance.address} className="border-2 overflow-hidden rounded-xl">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <div className="text-base font-semibold">{balance.symbol}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {ethers.utils.formatUnits(balance.balance, balance.decimals)}{' '}
+                                    {balance.symbol}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    handleWithdrawClick({
+                                      address: balance.address,
+                                      symbol: balance.symbol,
+                                      balance: ethers.utils.formatUnits(
+                                        balance.balance,
+                                        balance.decimals
+                                      ),
+                                      decimals: balance.decimals,
+                                    });
+                                  }}
+                                >
+                                  Withdraw
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSwapPopupOpen(true)}
+                                >
+                                  Swap
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Show first 6 tokens when collapsed and there are more than 6 */}
+                  {!showAllTokens && vaultInfo.balances.length > 6 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {vaultInfo.balances.slice(0, 6).map((balance) => (
+                        <Card key={balance.address} className="border-2 overflow-hidden rounded-xl">
+                          <CardContent className="space-y-2">
+                            <div className="text-base font-semibold">{balance.symbol}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {ethers.utils.formatUnits(balance.balance, balance.decimals)}{' '}
+                              {balance.symbol}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  handleWithdrawClick({
+                                    address: balance.address,
+                                    symbol: balance.symbol,
+                                    balance: ethers.utils.formatUnits(
+                                      balance.balance,
+                                      balance.decimals
+                                    ),
+                                    decimals: balance.decimals,
+                                  });
+                                }}
+                                className="flex-1"
+                              >
+                                Withdraw
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSwapPopupOpen(true)}
+                                className="flex-1"
+                              >
+                                Swap
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -806,6 +959,123 @@ export const VaultManager: React.FC = () => {
           vaultBalances={vaultInfo?.balances}
         />
       )}
+
+      {/* Token List Popup */}
+      <Dialog open={tokenListPopupOpen} onOpenChange={setTokenListPopupOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <List className="size-5" />
+              All Tokens ({vaultInfo?.balances?.length || 0})
+            </DialogTitle>
+            <DialogDescription>Browse and manage all tokens in your vault</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
+              <Input
+                placeholder="Search tokens by symbol or address..."
+                value={tokenSearchQuery}
+                onChange={(e) => setTokenSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Token List */}
+            <div className="max-h-[50vh] overflow-y-auto space-y-2">
+              {filteredTokens.length > 0 ? (
+                filteredTokens.map((token) => (
+                  <Card key={token.address} className="border-2 overflow-hidden rounded-xl">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <div className="text-base font-semibold">{token.symbol}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {ethers.utils.formatUnits(token.balance, token.decimals)}{' '}
+                              {token.symbol}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {formatAddress(token.address)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              handleWithdrawClick({
+                                address: token.address,
+                                symbol: token.symbol,
+                                balance: ethers.utils.formatUnits(token.balance, token.decimals),
+                                decimals: token.decimals,
+                              });
+                              setTokenListPopupOpen(false);
+                            }}
+                          >
+                            Withdraw
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSwapPopupOpen(true);
+                              setTokenListPopupOpen(false);
+                            }}
+                          >
+                            Swap
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(token.address)}
+                          >
+                            <Copy className="size-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {tokenSearchQuery ? (
+                    <>
+                      <Search className="size-8 mx-auto mb-2 opacity-50" />
+                      <p>No tokens found matching "{tokenSearchQuery}"</p>
+                    </>
+                  ) : (
+                    <>
+                      <List className="size-8 mx-auto mb-2 opacity-50" />
+                      <p>No tokens available</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                {filteredTokens.length} of {vaultInfo?.balances?.length || 0} tokens
+                {tokenSearchQuery && ` matching "${tokenSearchQuery}"`}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTokenSearchQuery('');
+                  setTokenListPopupOpen(false);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

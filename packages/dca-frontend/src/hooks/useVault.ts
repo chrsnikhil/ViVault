@@ -91,8 +91,15 @@ export const useVault = () => {
       console.log('🔍 ===================================');
 
       // Create Vincent signer with EVM Transaction Signer Ability
+      // Use fallback RPC endpoints for better reliability
+      const rpcEndpoints = [
+        'https://sepolia.base.org',
+        'https://base-sepolia.g.alchemy.com/v2/demo', // Alchemy fallback
+        'https://base-sepolia.public.blastapi.io', // BlastAPI fallback
+      ];
+
       const vincentSigner = new VincentSigner(
-        'https://sepolia.base.org', // Base Sepolia RPC
+        rpcEndpoints[0], // Primary RPC endpoint
         authInfo.pkp.ethAddress,
         env.VITE_DELEGATEE_PRIVATE_KEY,
         authInfo.jwt // ✅ Pass the JWT!
@@ -166,33 +173,63 @@ export const useVault = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authInfo?.pkp.ethAddress]);
 
-  // Get vault factory contract (read-only)
-  const getVaultFactory = useCallback(() => {
-    if (!vincentProvider) throw new Error('Vincent provider not connected');
-    console.log('🔍 Creating VaultFactory contract with address:', CONTRACT_ADDRESSES.VaultFactory);
-    return new ethers.Contract(CONTRACT_ADDRESSES.VaultFactory, VAULT_FACTORY_ABI, vincentProvider);
+  // Helper function to get a working provider
+  const getWorkingProvider = useCallback(async (): Promise<ethers.providers.JsonRpcProvider> => {
+    // Skip the problematic sepolia.base.org endpoint and start with working ones
+    const rpcEndpoints = [
+      'https://base-sepolia.public.blastapi.io',
+      'https://base-sepolia.g.alchemy.com/v2/demo',
+      'https://sepolia.base.org', // Put this last since it's having issues
+    ];
+
+    for (const endpoint of rpcEndpoints) {
+      try {
+        const provider = new ethers.providers.JsonRpcProvider(endpoint);
+        // Test with a simple call that's less likely to fail
+        await provider.getBlockNumber();
+        console.log(`✅ Using RPC endpoint: ${endpoint}`);
+        return provider;
+      } catch (error) {
+        console.warn(`❌ RPC endpoint ${endpoint} failed:`, error);
+        continue;
+      }
+    }
+
+    // Fallback to vincentProvider if all endpoints fail
+    if (vincentProvider) {
+      console.log('⚠️ All RPC endpoints failed, using vincentProvider as fallback');
+      return vincentProvider;
+    }
+
+    throw new Error('No working RPC provider available');
   }, [vincentProvider]);
+
+  // Get vault factory contract (read-only)
+  const getVaultFactory = useCallback(async () => {
+    const provider = await getWorkingProvider();
+    console.log('🔍 Creating VaultFactory contract with address:', CONTRACT_ADDRESSES.VaultFactory);
+    return new ethers.Contract(CONTRACT_ADDRESSES.VaultFactory, VAULT_FACTORY_ABI, provider);
+  }, [getWorkingProvider]);
 
   // Get user vault contract (read-only)
   const getUserVault = useCallback(
-    (vaultAddress: string) => {
+    async (vaultAddress: string) => {
       console.log('🔍 getUserVault: Creating contract with address:', vaultAddress);
-      console.log('🔍 getUserVault: Vincent provider:', vincentProvider);
-      if (!vincentProvider) throw new Error('Vincent provider not connected');
-      const contract = new ethers.Contract(vaultAddress, USER_VAULT_ABI, vincentProvider);
+      const provider = await getWorkingProvider();
+      const contract = new ethers.Contract(vaultAddress, USER_VAULT_ABI, provider);
       console.log('🔍 getUserVault: Contract created:', contract);
       return contract;
     },
-    [vincentProvider]
+    [getWorkingProvider]
   );
 
   // Get ERC20 contract (read-only)
   const getERC20Contract = useCallback(
-    (tokenAddress: string) => {
-      if (!vincentProvider) throw new Error('Vincent provider not connected');
-      return new ethers.Contract(tokenAddress, ERC20_ABI, vincentProvider);
+    async (tokenAddress: string) => {
+      const provider = await getWorkingProvider();
+      return new ethers.Contract(tokenAddress, ERC20_ABI, provider);
     },
-    [vincentProvider]
+    [getWorkingProvider]
   );
 
   // Check if user has a vault
@@ -206,7 +243,7 @@ export const useVault = () => {
 
     try {
       console.log('🔍 hasVault: Checking for Vincent account:', account);
-      const factory = getVaultFactory();
+      const factory = await getVaultFactory();
       const result = await factory.hasVault(account);
       console.log('🔍 hasVault: Result:', result);
       return result;
@@ -227,7 +264,7 @@ export const useVault = () => {
 
     try {
       console.log('🔍 getVaultAddress: Getting vault for Vincent account:', account);
-      const factory = getVaultFactory();
+      const factory = await getVaultFactory();
       const address = await factory.getVault(account);
       console.log('🔍 getVaultAddress: Raw address:', address);
       const result = address === '0x0000000000000000000000000000000000000000' ? null : address;
@@ -243,7 +280,7 @@ export const useVault = () => {
   const getTokenInfo = useCallback(
     async (tokenAddress: string) => {
       try {
-        const erc20 = getERC20Contract(tokenAddress);
+        const erc20 = await getERC20Contract(tokenAddress);
         const [name, symbol, decimals] = await Promise.all([
           erc20.name(),
           erc20.symbol(),
@@ -262,13 +299,10 @@ export const useVault = () => {
   const getVaultInfo = useCallback(
     async (vaultAddress: string): Promise<VaultInfo> => {
       try {
-        const vault = getUserVault(vaultAddress);
+        const vault = await getUserVault(vaultAddress);
+        const provider = await getWorkingProvider();
 
-        if (!vincentProvider) {
-          throw new Error('Vincent provider not available');
-        }
-
-        const code = await vincentProvider.getCode(vaultAddress);
+        const code = await provider.getCode(vaultAddress);
         if (code === '0x') {
           throw new Error('No contract found at this address');
         }
@@ -319,7 +353,7 @@ export const useVault = () => {
         const balances: TokenBalance[] = await Promise.all(
           tokensToCheck.map(async (tokenAddress: string, index: number) => {
             try {
-              const erc20 = getERC20Contract(tokenAddress);
+              const erc20 = await getERC20Contract(tokenAddress);
               const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
               const rawBalance = balancesRaw[index]?.toString() || '0';
               return {
@@ -348,19 +382,13 @@ export const useVault = () => {
           tokenCount: tokenCount.toNumber(),
         };
 
-        // Auto-register common tokens in background (don't wait for it)
-        autoRegisterCommonTokens(vaultAddress).catch((error) => {
-          console.warn('⚠️ Background auto-registration failed:', error);
-        });
-
         return result;
       } catch (err) {
         console.error('❌ Error getting vault info:', err);
         throw err;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getUserVault, getERC20Contract, vincentProvider]
+    [getUserVault, getERC20Contract, getWorkingProvider]
   );
 
   // Withdraw tokens from vault using Vincent EVM Transaction Signer Ability
@@ -505,7 +533,7 @@ export const useVault = () => {
   // Auto-register tokens that have balances but aren't registered
   const autoRegisterCommonTokens = useCallback(
     async (vaultAddress: string): Promise<void> => {
-      if (!vincentProvider || !authInfo?.pkp.ethAddress || !authInfo?.jwt) {
+      if (!authInfo?.pkp.ethAddress || !authInfo?.jwt) {
         return;
       }
 
@@ -518,12 +546,13 @@ export const useVault = () => {
         ];
 
         const tokensToRegister: string[] = [];
+        const provider = await getWorkingProvider();
 
         // Get currently supported tokens to avoid re-registering
         const vaultContract = new ethers.Contract(
           vaultAddress,
           ['function getSupportedTokens() external view returns (address[] memory)'],
-          vincentProvider
+          provider
         );
         const supportedTokens = await vaultContract.getSupportedTokens();
 
@@ -533,7 +562,7 @@ export const useVault = () => {
             const tokenContract = new ethers.Contract(
               tokenAddress,
               ['function balanceOf(address owner) view returns (uint256)'],
-              vincentProvider
+              provider
             );
             const balance = await tokenContract.balanceOf(vaultAddress);
 
@@ -556,7 +585,7 @@ export const useVault = () => {
         // Don't throw - this is a background operation
       }
     },
-    [vincentProvider, authInfo?.pkp.ethAddress, authInfo?.jwt, registerExistingTokens]
+    [authInfo?.pkp.ethAddress, authInfo?.jwt, registerExistingTokens, getWorkingProvider]
   );
 
   return {
@@ -569,5 +598,6 @@ export const useVault = () => {
     getTokenInfo,
     withdraw,
     registerExistingTokens,
+    autoRegisterCommonTokens,
   };
 };
