@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 import { useChain } from '@/hooks/useChain';
-import { usePKPWalletConnect } from './pkp-walletconnect-context';
+// WalletConnect removed
 
 interface Web3ContextType {
   // Vincent PKP wallet
@@ -43,15 +43,18 @@ interface Web3ProviderProps {
 export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const { authInfo } = useJwtContext();
   const { provider: chainProvider, chain } = useChain();
-  const {
-    pkpEthersWallet,
-    pkpWalletConnect,
-    isInitialized: isWalletConnectInitialized,
-    activeSessions,
-    connectToDApp,
-    disconnectFromDApp,
-    getActiveSessions,
-  } = usePKPWalletConnect();
+  // WalletConnect removed: provide disabled placeholders
+  const pkpEthersWallet = null;
+  const pkpWalletConnect = null;
+  const isWalletConnectInitialized = false;
+  const activeSessions: unknown[] = [];
+  const connectToDApp = async () => {
+    throw new Error('WalletConnect is disabled');
+  };
+  const disconnectFromDApp = async () => {
+    // no-op
+  };
+  const getActiveSessions = () => [] as unknown[];
 
   // Vincent PKP wallet state
   const [vincentProvider, setVincentProvider] = useState<ethers.providers.JsonRpcProvider | null>(

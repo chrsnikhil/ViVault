@@ -9,12 +9,23 @@ import ComponentGallery from '@/components/component-gallery';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { VaultManager } from '@/components/vault-manager';
-import { Menu, X, ArrowRight, CheckCircle, Clock, DollarSign, WalletIcon } from 'lucide-react';
+import { PriceFeedPage } from '@/pages/price-feed';
+import {
+  Menu,
+  X,
+  ArrowRight,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  WalletIcon,
+  TrendingUp,
+} from 'lucide-react';
 
 export const Home: React.FC = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<'home' | 'price-feed'>('home');
 
   // Framer Motion variants following styleguide patterns
   const fadeInUp = {
@@ -33,6 +44,91 @@ export const Home: React.FC = () => {
     mq.addEventListener?.('change', apply);
     return () => mq.removeEventListener?.('change', apply);
   }, []);
+
+  // Show price feed page if selected
+  if (currentPage === 'price-feed') {
+    return (
+      <main className="relative min-h-screen bg-background">
+        {/* Header */}
+        <header className="pointer-events-none">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+            <motion.div variants={fadeInUp}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-background/90 backdrop-blur-sm border-input shadow-sm hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-expanded={menuOpen}
+                aria-controls="header-menu"
+              >
+                {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+                <span className="sr-only">{menuOpen ? 'Close menu' : 'Open menu'}</span>
+              </Button>
+            </motion.div>
+          </div>
+
+          {/* Popup panel */}
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                key="header-popover"
+                id="header-menu"
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{
+                  opacity: 1,
+                  y: 8,
+                  scale: 1,
+                  transition: { duration: 0.25, ease: 'easeOut' },
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -8,
+                  scale: 0.98,
+                  transition: { duration: 0.2, ease: 'easeIn' },
+                }}
+                className="fixed left-1/2 -translate-x-1/2 top-14 z-40 w-[min(92vw,72rem)] pointer-events-auto"
+              >
+                <Card className="bg-background/95 backdrop-blur-sm border shadow-lg">
+                  <CardContent className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-md border bg-primary/10 flex items-center justify-center">
+                          <span className="text-primary font-semibold text-sm">ML</span>
+                        </div>
+                        <span className="text-foreground font-semibold text-lg">MicroLend</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button size="sm" variant="outline" onClick={() => setCurrentPage('home')}>
+                          <ArrowRight className="size-4 mr-2" />
+                          Back to Home
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setWalletModalOpen(true)}
+                        >
+                          <WalletIcon className="size-4 mr-2" />
+                          Wallet
+                        </Button>
+                        <ThemeToggle />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </header>
+
+        <div className="pt-20">
+          <PriceFeedPage />
+        </div>
+
+        {/* Wallet Modal */}
+        <WalletModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen bg-background">
@@ -92,6 +188,14 @@ export const Home: React.FC = () => {
                         <span className="text-foreground font-semibold text-lg">MicroLend</span>
                       </div>
                       <div className="flex items-center gap-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCurrentPage('price-feed')}
+                        >
+                          <TrendingUp className="size-4 mr-2" />
+                          Price Feed
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

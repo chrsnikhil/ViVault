@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpDown, Loader2, AlertCircle, CheckCircle, ExternalLink, X } from 'lucide-react';
+import { ArrowUpDown, Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 import { VincentUniswapSwapService, type SwapParams } from '@/lib/vincent-uniswap-swap';
 import { COMMON_TOKENS, USER_VAULT_ABI, ERC20_ABI } from '@/config/contracts';
@@ -56,6 +56,12 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [successDetails, setSuccessDetails] = useState<null | {
+    withdraw?: string;
+    approve?: string | null;
+    swap?: string;
+    transfer?: string | null;
+  }>(null);
 
   // Swap parameters
   const [tokenIn, setTokenIn] = useState<string>(COMMON_TOKENS.WETH); // Default to WETH
@@ -71,6 +77,16 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
   // Service
   const [swapService] = useState(() => new VincentUniswapSwapService());
 
+  // Normalize symbols to improve matching (e.g., "Wrapped Ether" -> "weth", "USDC-Circle" -> "usdc")
+  const normalizeSymbol = useCallback((s?: string) => {
+    if (!s) return '';
+    const lower = s.toLowerCase();
+    if (lower.includes('wrapped') && (lower.includes('eth') || lower.includes('ether')))
+      return 'weth';
+    if (lower.includes('usdc')) return 'usdc';
+    return lower.replace(/[^a-z0-9]/g, '');
+  }, []);
+
   // Available tokens for swapping (WETH to USDC-Circle)
   const availableTokens = useMemo(
     () => [
@@ -79,21 +95,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     ],
     []
   );
-
-  // Load token balances when popup opens or parameters change
-  useEffect(() => {
-    if (isOpen && authInfo?.pkp.ethAddress) {
-      loadBalances();
-    }
-  }, [
-    isOpen,
-    authInfo?.pkp.ethAddress,
-    tokenIn,
-    tokenOut,
-    vaultBalances,
-    vaultAddress,
-    loadBalances,
-  ]);
 
   const loadBalances = useCallback(async () => {
     if (!authInfo?.pkp.ethAddress) return;
@@ -115,11 +116,16 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
           // Get balance from vault
           if (vaultBalances && vaultAddress) {
-            const vaultBalance = vaultBalances.find(
-              (b) => b.address.toLowerCase() === tokenIn.toLowerCase()
-            );
-            if (vaultBalance) {
-              balance = vaultBalance.balance;
+            // Prefer exact address match; fallback to same-symbol match
+            let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
+            if (!vb) {
+              const targetSym = normalizeSymbol(tokenInData.symbol);
+              vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
+            }
+            if (vb) {
+              balance = vb.balance;
+              // Track the actual vault-held address for use in contract calls
+              setTokenInResolved(vb.address);
               console.log(
                 '🔍 SwapPopup: Using vault balance for',
                 tokenInData.symbol,
@@ -147,11 +153,15 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
           // Get balance from vault
           if (vaultBalances && vaultAddress) {
-            const vaultBalance = vaultBalances.find(
-              (b) => b.address.toLowerCase() === tokenOut.toLowerCase()
-            );
-            if (vaultBalance) {
-              balance = vaultBalance.balance;
+            // Prefer exact address match; fallback to same-symbol match
+            let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
+            if (!vb) {
+              const targetSym = normalizeSymbol(tokenOutData.symbol);
+              vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
+            }
+            if (vb) {
+              balance = vb.balance;
+              setTokenOutResolved(vb.address);
               console.log(
                 '🔍 SwapPopup: Using vault balance for',
                 tokenOutData.symbol,
@@ -180,8 +190,24 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     tokenOut,
     vaultBalances,
     vaultAddress,
+    normalizeSymbol,
     availableTokens,
     swapService,
+  ]);
+
+  // Load token balances when popup opens or parameters change
+  useEffect(() => {
+    if (isOpen && authInfo?.pkp.ethAddress) {
+      loadBalances();
+    }
+  }, [
+    isOpen,
+    authInfo?.pkp.ethAddress,
+    tokenIn,
+    tokenOut,
+    vaultBalances,
+    vaultAddress,
+    loadBalances,
   ]);
 
   const handleSwapTokens = () => {
@@ -193,7 +219,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
   const handleMaxAmount = () => {
     if (tokenInInfo) {
-      setAmountIn(tokenInInfo.balance);
+      const formattedBalance = ethers.utils.formatUnits(tokenInInfo.balance, tokenInInfo.decimals);
+      setAmountIn(formattedBalance);
     }
   };
 
@@ -413,21 +440,33 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             // Don't fail the entire swap if registration fails
           }
 
-          setSuccess(
-            `Swap completed successfully! Withdraw: ${withdrawTx.hash}, Approve: ${approveTx?.hash || 'N/A'}, Swap: ${result.swapTxHash}, Transfer back: ${transferTx.hash}`
-          );
+          setSuccess('Swap completed successfully!');
+          setSuccessDetails({
+            withdraw: withdrawTx.hash,
+            approve: approveTx?.hash || null,
+            swap: result.swapTxHash,
+            transfer: transferTx.hash,
+          });
         } else {
           console.log('⚠️ No output tokens found in PKP wallet to transfer back to vault');
           console.log('🔍 This might be due to timing - the swap may still be processing');
-          setSuccess(
-            `Swap completed successfully! Withdraw: ${withdrawTx.hash}, Approve: ${approveTx?.hash || 'N/A'}, Swap: ${result.swapTxHash}. Note: USDC may still be in PKP wallet due to timing.`
-          );
+          setSuccess('Swap completed successfully!');
+          setSuccessDetails({
+            withdraw: withdrawTx.hash,
+            approve: approveTx?.hash || null,
+            swap: result.swapTxHash,
+            transfer: null,
+          });
         }
       } else {
         console.log('⚠️ Output token not found in available tokens');
-        setSuccess(
-          `Swap completed successfully! Withdraw: ${withdrawTx.hash}, Approve: ${approveTx?.hash || 'N/A'}, Swap: ${result.swapTxHash}`
-        );
+        setSuccess('Swap completed successfully!');
+        setSuccessDetails({
+          withdraw: withdrawTx.hash,
+          approve: approveTx?.hash || null,
+          swap: result.swapTxHash,
+          transfer: null,
+        });
       }
 
       // Clear form
@@ -452,6 +491,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     setError(null);
     setSuccess(null);
     setAmountIn('');
+    setSuccessDetails(null);
     onClose();
   };
 
@@ -478,15 +518,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>Token Swap</DialogTitle>
-              <DialogDescription>Swap WETH to USDC-Circle using Uniswap V3</DialogDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleClose}>
-              <X className="size-4" />
-            </Button>
-          </div>
+          <DialogTitle>Token Swap</DialogTitle>
+          <DialogDescription>Swap WETH to USDC-Circle using Uniswap V3</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -502,21 +535,63 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
           {success && (
             <Alert>
               <CheckCircle className="size-4" />
-              <AlertDescription>
-                {success}
-                {success.includes('Transaction:') && (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="ml-2 p-0 h-auto"
-                    onClick={() => {
-                      const txHash = success.split('Transaction: ')[1];
-                      window.open(getBaseScanUrl(txHash), '_blank');
-                    }}
-                  >
-                    <ExternalLink className="size-3 mr-1" />
-                    View on BaseScan
-                  </Button>
+              <AlertDescription className="space-y-2">
+                <div className="font-medium">{success}</div>
+                {successDetails && (
+                  <div className="grid grid-cols-1 gap-1 text-[11px] leading-tight">
+                    {successDetails.withdraw && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Withdraw:</span>
+                        <a
+                          href={getBaseScanUrl(successDetails.withdraw!)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" /> View
+                        </a>
+                      </div>
+                    )}
+                    {successDetails.approve && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Approve:</span>
+                        <a
+                          href={getBaseScanUrl(successDetails.approve!)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" /> View
+                        </a>
+                      </div>
+                    )}
+                    {successDetails.swap && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Swap:</span>
+                        <a
+                          href={getBaseScanUrl(successDetails.swap!)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" /> View
+                        </a>
+                      </div>
+                    )}
+                    {successDetails.transfer && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Transfer:</span>
+                        <a
+                          href={getBaseScanUrl(successDetails.transfer!)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" /> View
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 )}
               </AlertDescription>
             </Alert>
@@ -539,7 +614,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenInInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {parseFloat(tokenInInfo.balance).toFixed(6)} {tokenInInfo.symbol}
+                Balance: {ethers.utils.formatUnits(tokenInInfo.balance, tokenInInfo.decimals)}{' '}
+                {tokenInInfo.symbol}
               </div>
             )}
           </div>
@@ -591,7 +667,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenOutInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {parseFloat(tokenOutInfo.balance).toFixed(6)} {tokenOutInfo.symbol}
+                Balance: {ethers.utils.formatUnits(tokenOutInfo.balance, tokenOutInfo.decimals)}{' '}
+                {tokenOutInfo.symbol}
               </div>
             )}
           </div>

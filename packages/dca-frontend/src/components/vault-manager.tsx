@@ -1,18 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import {
   Wallet,
   Plus,
@@ -22,28 +12,30 @@ import {
   Copy,
   RefreshCw,
   ArrowUpDown,
+  TrendingUp,
 } from 'lucide-react';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
+import { Pie } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip as ChartTooltipJS,
+  Legend as ChartLegendJS,
+} from 'chart.js';
 import { useWeb3 } from '@/contexts/web3-context';
 import { useVault, type VaultInfo } from '@/hooks/useVault';
 import { ethers } from 'ethers';
+import { PriceCalculator, type TokenValue } from '@/lib/price-calculator';
 import { WithdrawPopup } from '@/components/withdraw-popup';
 import { SwapPopup } from '@/components/swap-popup';
-import { CONTRACT_ADDRESSES, COMMON_TOKENS } from '@/config/contracts';
 
 export const VaultManager: React.FC = () => {
-  console.log('🔍 VaultManager: Component starting to render');
+  ChartJS.register(ArcElement, ChartTooltipJS, ChartLegendJS);
 
-  // All useState hooks must be called first, before any other hooks
+  // State management
   const [vaultInfo, setVaultInfo] = useState<VaultInfo | null>(null);
   const [userHasVault, setUserHasVault] = useState(false);
   const [vaultAddress, setVaultAddress] = useState<string | null>(null);
-  const [view, setView] = useState<'overview'>('overview');
-  const [selectedToken, setSelectedToken] = useState<string>('');
-  const [customTokenAddress, setCustomTokenAddress] = useState<string>('');
-  const [customTokens, setCustomTokens] = useState<{
-    [address: string]: { name: string; symbol: string; decimals: number };
-  }>({});
   const [withdrawPopupOpen, setWithdrawPopupOpen] = useState(false);
   const [selectedTokenForWithdraw, setSelectedTokenForWithdraw] = useState<{
     address: string;
@@ -53,7 +45,16 @@ export const VaultManager: React.FC = () => {
   } | null>(null);
   const [swapPopupOpen, setSwapPopupOpen] = useState(false);
 
-  // Then call other hooks
+  // Local price calculator and computed vault value
+  const [priceCalculator] = useState(() => new PriceCalculator());
+  const [vaultValue, setVaultValue] = useState<{
+    totalUsdValue: number;
+    tokenValues: TokenValue[];
+    breakdown: Array<{ symbol: string; value: number; percentage: number }>;
+  }>({ totalUsdValue: 0, tokenValues: [], breakdown: [] });
+  const [valuing, setValuing] = useState(false);
+
+  // Hooks
   const { authInfo } = useJwtContext();
   const { chainId, vincentAccount, vincentProvider } = useWeb3();
   const {
@@ -63,201 +64,230 @@ export const VaultManager: React.FC = () => {
     getVaultAddress,
     createVaultWithVincent,
     getVaultInfo,
-    getTokenInfo,
     withdraw,
     registerExistingTokens,
   } = useVault();
+  // Lightweight Hermes price fetcher (REST via CORS-friendly proxies)
+  const fetchLatestPrices = useCallback(async (): Promise<
+    Array<{ id: string; symbol: string; price: number; confidence: number; publishTime: number }>
+  > => {
+    const PYTH_PRICE_IDS = [
+      '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD
+      '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a', // USDC/USD
+    ];
+    const SYMBOLS = ['WETH', 'USDC'];
+    const proxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://thingproxy.freeboard.io/fetch/',
+    ];
+    const targetUrl = `https://hermes.pyth.network/v2/updates/price/latest?${PYTH_PRICE_IDS.map((id) => `ids[]=${id}`).join('&')}`;
 
-  // Direct balance fetching function (like the debug buttons)
-  const fetchDirectBalances = async () => {
-    if (!vaultAddress || !vincentProvider) return null;
+    let lastError: unknown = null;
+    for (const proxy of proxies) {
+      try {
+        const url = `${proxy}${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && data.parsed && Array.isArray(data.parsed)) {
+          const newPrices = data.parsed.map(
+            (update: { price: { price: string; expo: number; conf: string } }, index: number) => {
+              const symbol = SYMBOLS[index] || 'UNKNOWN';
+              const rawPrice = parseFloat(update.price.price);
+              const expo = update.price.expo;
+              let price = rawPrice * Math.pow(10, expo);
+              const confidence = parseFloat(update.price.conf) * Math.pow(10, expo);
+              // Guard against exponent issues on WETH
+              if (symbol === 'WETH' && price > 10000) price = rawPrice;
+              return {
+                id: update.id as string,
+                symbol,
+                price,
+                confidence,
+                publishTime: update.price.publish_time as number,
+              };
+            }
+          );
+          return newPrices;
+        }
+      } catch (e) {
+        lastError = e;
+        continue;
+      }
+    }
+    throw lastError ?? new Error('Failed to fetch prices');
+  }, []);
+
+  // Recalculate vault value when balances change
+  const updateVaultValue = useCallback(async () => {
+    if (!vaultInfo?.balances || vaultInfo.balances.length === 0) {
+      setVaultValue({ totalUsdValue: 0, tokenValues: [], breakdown: [] });
+      return;
+    }
+
+    // Normalize balances to wei strings and map symbols to price keys
+    const normalized = vaultInfo.balances
+      .map((b) => {
+        let wei = '0';
+        try {
+          wei = ethers.BigNumber.from(b.balance).toString();
+        } catch {
+          try {
+            wei = ethers.utils.parseUnits(String(b.balance), b.decimals).toString();
+          } catch {
+            wei = '0';
+          }
+        }
+        const symbol = b.symbol === 'USDC-Circle' ? 'USDC' : b.symbol;
+        return { ...b, balance: wei, symbol };
+      })
+      .filter((b) => {
+        try {
+          return ethers.BigNumber.from(b.balance).gt(0);
+        } catch {
+          return false;
+        }
+      });
+    if (normalized.length === 0) {
+      setVaultValue({ totalUsdValue: 0, tokenValues: [], breakdown: [] });
+      return;
+    }
+
+    // Fetch latest prices and compute
+    setValuing(true);
+    try {
+      const latest = await fetchLatestPrices();
+      priceCalculator.updatePrices(latest);
+      const tokenBalances = normalized.map((b) => ({
+        tokenAddress: b.address,
+        balance: b.balance,
+        symbol: b.symbol,
+        decimals: b.decimals,
+      }));
+      const result = priceCalculator.calculateVaultValue(tokenBalances);
+      setVaultValue(result);
+    } catch {
+      // If price fetch fails, keep zeroed values
+      setVaultValue({ totalUsdValue: 0, tokenValues: [], breakdown: [] });
+    } finally {
+      setValuing(false);
+    }
+  }, [vaultInfo, fetchLatestPrices, priceCalculator]);
+
+  useEffect(() => {
+    updateVaultValue();
+  }, [updateVaultValue]);
+
+  // Manual auto-registration function
+  const handleAutoRegisterTokens = useCallback(async () => {
+    if (!vaultInfo?.address) return;
 
     try {
-      console.log('🔍 fetchDirectBalances: Fetching balances directly...');
-      const vaultContract = new ethers.Contract(
-        vaultAddress,
-        [
-          'function getSupportedTokens() external view returns (address[] memory)',
-          'function getBalances(address[] calldata tokens) external view returns (uint256[] memory)',
-        ],
-        vincentProvider
-      );
+      // Check for common tokens with balances
+      const commonTokens = [
+        '0x4200000000000000000000000000000000000006', // WETH
+        '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC-Circle
+      ];
 
-      // First, get the supported tokens from the vault
-      let tokensToCheck = [];
-      try {
-        const supportedTokens = await vaultContract.getSupportedTokens();
-        console.log('🔍 fetchDirectBalances: Supported tokens from vault:', supportedTokens);
+      const tokensToRegister: string[] = [];
 
-        if (supportedTokens.length > 0) {
-          tokensToCheck = supportedTokens;
-        } else {
-          // For new vaults, check common tokens
-          tokensToCheck = Object.values(COMMON_TOKENS);
-        }
-      } catch (supportedTokensError) {
-        console.log(
-          '🔍 fetchDirectBalances: getSupportedTokens() failed, using common tokens:',
-          supportedTokensError
-        );
-        tokensToCheck = Object.values(COMMON_TOKENS);
-      }
+      for (const tokenAddress of commonTokens) {
+        try {
+          // Check if token has balance in vault
+          if (!vincentProvider) continue;
 
-      console.log('🔍 fetchDirectBalances: Tokens to check:', tokensToCheck);
-      const balancesRaw = await vaultContract.getBalances(tokensToCheck);
-      console.log('🔍 fetchDirectBalances: Raw balances:', balancesRaw);
+          const tokenContract = new ethers.Contract(
+            tokenAddress,
+            ['function balanceOf(address owner) view returns (uint256)'],
+            vincentProvider
+          );
+          const balance = await tokenContract.balanceOf(vaultInfo.address);
 
-      const balances = await Promise.all(
-        tokensToCheck.map(async (tokenAddress: string, index: number) => {
-          try {
-            const erc20 = new ethers.Contract(
-              tokenAddress,
-              [
-                'function symbol() view returns (string)',
-                'function decimals() view returns (uint8)',
-              ],
+          if (balance.gt(0)) {
+            // Check if token is already registered
+            const vaultContract = new ethers.Contract(
+              vaultInfo.address,
+              ['function getSupportedTokens() external view returns (address[] memory)'],
               vincentProvider
             );
-            const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
-            return {
-              address: tokenAddress,
-              symbol: symbol,
-              balance: (
-                parseFloat(balancesRaw[index]?.toString() || '0') /
-                10 ** decimals
-              ).toString(),
-              decimals: decimals,
-            };
-          } catch (tokenError) {
-            console.log(
-              `🔍 fetchDirectBalances: Error getting info for token ${tokenAddress}:`,
-              tokenError
-            );
-            return {
-              address: tokenAddress,
-              symbol: 'UNK',
-              balance: '0',
-              decimals: 18,
-            };
-          }
-        })
-      );
+            const supportedTokens = await vaultContract.getSupportedTokens();
 
-      console.log('🔍 fetchDirectBalances: Processed balances:', balances);
-      return balances;
+            if (!supportedTokens.includes(tokenAddress)) {
+              tokensToRegister.push(tokenAddress);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Error checking token:', tokenAddress, error);
+        }
+      }
+
+      if (tokensToRegister.length > 0) {
+        await registerExistingTokens(vaultInfo.address, tokensToRegister);
+
+        // Refresh vault info to show the newly registered tokens
+        await refreshVaultStatus();
+      }
+    } catch (error) {
+      console.error('❌ Auto-registration failed:', error);
+    }
+  }, [vaultInfo?.address, registerExistingTokens, vincentProvider, refreshVaultStatus]);
+
+  // Refresh vault status
+  const refreshVaultStatus = useCallback(async () => {
+    if (!vaultAddress) return;
+    try {
+      setLoading(true);
+      const info = await getVaultInfo(vaultAddress);
+      setVaultInfo(info);
+    } catch (error) {
+      console.error('Failed to refresh vault status:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [vaultAddress, getVaultInfo]);
+
+  // Utility functions
+  const formatAddress = (address: string): string => {
+    if (!address) return 'N/A';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log('✅ Copied to clipboard:', text);
     } catch (err) {
-      console.error('❌ fetchDirectBalances: Error:', err);
-      return null;
+      console.error('❌ Failed to copy:', err);
     }
   };
 
-  console.log('🔍 VaultManager render:', {
-    authInfo: !!authInfo,
-    chainId,
-    loading,
-    error,
-    vincentAccount,
-    userHasVault,
-    vaultAddress,
-    vaultInfo: !!vaultInfo,
-  });
-
-  // Check if user has a vault
-  useEffect(() => {
-    const checkVault = async () => {
-      // Check for vault if we have a connected Vincent wallet
-      if (vincentAccount) {
-        console.log('🔍 Checking vault for Vincent wallet:', vincentAccount);
-        try {
-          const hasVaultResult = await hasVault();
-          console.log('🔍 Has vault result:', hasVaultResult);
-          setUserHasVault(hasVaultResult);
-
-          if (hasVaultResult) {
-            console.log('🔍 User has vault, getting address...');
-            const vaultAddress = await getVaultAddress();
-            console.log('🔍 Vault address from blockchain:', vaultAddress);
-            if (vaultAddress) {
-              console.log('🔍 Vault address found, getting info...');
-              setVaultAddress(vaultAddress);
-              try {
-                console.log('🔍 Testing contract existence at:', vaultAddress);
-                // Test if contract exists by checking code
-                if (vincentProvider) {
-                  const code = await vincentProvider.getCode(vaultAddress);
-                  console.log('🔍 Contract code length:', code.length);
-                  if (code === '0x') {
-                    console.error('❌ No contract found at vault address!');
-                    setVaultInfo(null);
-                    return;
-                  }
-                }
-
-                const info = await getVaultInfo(vaultAddress);
-                console.log('🔍 Vault info retrieved successfully:', info);
-                setVaultInfo(info);
-              } catch (err) {
-                console.error('❌ Failed to get vault info:', err);
-                console.error('❌ Error details:', {
-                  message: err instanceof Error ? err.message : 'Unknown error',
-                  stack: err instanceof Error ? err.stack : undefined,
-                });
-                setVaultInfo(null);
-              }
-            } else {
-              console.log('🔍 No vault address found despite hasVault=true');
-              setVaultAddress(null);
-              setVaultInfo(null);
-            }
-          }
-        } catch (err) {
-          console.error('❌ Error checking vault:', err);
-        }
-      } else {
-        console.log('🔍 No Vincent wallet connected for vault operations');
-        setUserHasVault(false);
-        setVaultInfo(null);
-      }
-    };
-
-    checkVault();
-  }, [vincentAccount, vincentProvider, hasVault, getVaultAddress, getVaultInfo]);
-
-  const handleCreateVault = async () => {
+  // Vault operations
+  const refreshVaultStatus = async () => {
     try {
-      const vaultAddress = await createVaultWithVincent();
-      console.log('🔍 Vault created successfully with Vincent PKP:', vaultAddress);
-
-      // Wait a moment for blockchain state to update
-      console.log('🔍 Waiting for blockchain state to update...');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Force refresh vault status
-      console.log('🔍 Refreshing vault status...');
       const hasVaultResult = await hasVault();
-      console.log('🔍 Has vault after creation:', hasVaultResult);
       setUserHasVault(hasVaultResult);
 
       if (hasVaultResult) {
-        const actualVaultAddress = await getVaultAddress();
-        console.log('🔍 Actual vault address from blockchain:', actualVaultAddress);
-        if (actualVaultAddress) {
-          const info = await getVaultInfo(actualVaultAddress);
-          console.log('🔍 Vault info after creation:', info);
+        const address = await getVaultAddress();
+        setVaultAddress(address);
+
+        if (address) {
+          const info = await getVaultInfo(address);
           setVaultInfo(info);
         }
       }
     } catch (err) {
-      console.error('Failed to create vault:', err);
+      console.error('❌ Error refreshing vault status:', err);
     }
   };
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCreateVault = async () => {
+    try {
+      await createVaultWithVincent();
+      await refreshVaultStatus();
+    } catch (err) {
+      console.error('❌ Error creating vault:', err);
+    }
   };
 
   const handleWithdrawClick = (token: {
@@ -271,90 +301,32 @@ export const VaultManager: React.FC = () => {
   };
 
   const handleWithdraw = async (recipientAddress: string, amount: string) => {
-    if (!vaultAddress || !selectedTokenForWithdraw) {
-      throw new Error('Missing vault address or token information');
-    }
+    try {
+      if (!vaultAddress || !selectedTokenForWithdraw)
+        throw new Error('No vault address or token selected');
 
-    await withdraw(vaultAddress, selectedTokenForWithdraw.address, amount, recipientAddress);
-
-    // Refresh vault info after successful withdrawal
-    const updatedInfo = await getVaultInfo(vaultAddress);
-    setVaultInfo(updatedInfo);
-  };
-
-  const refreshVaultStatus = async () => {
-    console.log('🔍 Manual refresh: Checking vault status...');
-    if (vincentAccount) {
-      try {
-        const hasVaultResult = await hasVault();
-        console.log('🔍 Manual refresh: Has vault result:', hasVaultResult);
-        setUserHasVault(hasVaultResult);
-
-        if (hasVaultResult) {
-          const vaultAddress = await getVaultAddress();
-          console.log('🔍 Manual refresh: Vault address:', vaultAddress);
-          if (vaultAddress) {
-            setVaultAddress(vaultAddress);
-            const info = await getVaultInfo(vaultAddress);
-            console.log('🔍 Manual refresh: Vault info:', info);
-            setVaultInfo(info);
-          } else {
-            setVaultAddress(null);
-            setVaultInfo(null);
-          }
-        } else {
-          setVaultAddress(null);
-          setVaultInfo(null);
-        }
-      } catch (err) {
-        console.error('❌ Error refreshing vault status:', err);
-      }
+      await withdraw(vaultAddress, selectedTokenForWithdraw.address, amount, recipientAddress);
+      await refreshVaultStatus();
+    } catch (err) {
+      console.error('❌ Error withdrawing:', err);
+      throw err;
     }
   };
 
-  // Vincent wallet is required
-  if (!authInfo?.pkp.ethAddress) {
-    return (
-      <Card className="w-full max-w-2xl mx-auto border-2">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-2xl">
-            <Wallet className="size-6" />
-            Connect Vincent Wallet
-          </CardTitle>
-          <CardDescription className="text-base mt-2">
-            Connect your Vincent PKP wallet to create and manage your ViVault
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-2">
-          <Alert className="p-6 border-2 bg-blue-50 dark:bg-blue-950/20">
-            <AlertCircle className="size-5 text-blue-600" />
-            <AlertDescription className="text-sm leading-relaxed">
-              ViVault requires a Vincent PKP wallet for secure vault management and transaction
-              signing. Please connect your Vincent wallet to continue.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Initialize vault status
+  useEffect(() => {
+    refreshVaultStatus();
+  }, [vincentAccount, refreshVaultStatus]);
 
+  // Network check
   if (chainId !== 84532) {
     return (
-      <Card className="w-full max-w-2xl mx-auto border-2">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-2xl text-destructive">
-            <AlertCircle className="size-6" />
-            Wrong Network
-          </CardTitle>
-          <CardDescription className="text-base">
-            Please switch to Base Sepolia network to use ViVault
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive" className="border-2">
-            <AlertCircle className="size-5" />
+      <Card className="border-2">
+        <CardContent className="pt-6">
+          <Alert className="border-2">
+            <AlertCircle className="size-4" />
             <AlertDescription className="font-medium">
-              Current network: {chainId}. Please switch to Base Sepolia (84532) in your wallet.
+              Please switch to Base Sepolia network to use the vault manager.
             </AlertDescription>
           </Alert>
           <div className="mt-4">
@@ -366,7 +338,6 @@ export const VaultManager: React.FC = () => {
                     params: [{ chainId: '0x14a34' }], // 84532 in hex
                   });
                 } catch (switchError: unknown) {
-                  // This error code indicates that the chain has not been added to MetaMask
                   if (
                     switchError &&
                     typeof switchError === 'object' &&
@@ -409,47 +380,7 @@ export const VaultManager: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8">
-      {/* Header */}
-      <Card className="border-2">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-3 text-2xl">
-                <Wallet className="size-6" />
-                ViVault Manager
-              </CardTitle>
-              <CardDescription className="text-base">
-                Manage your volatility-based portfolio vault with advanced strategies
-              </CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Badge variant="secondary" className="w-fit">
-                  Vincent: {formatAddress(vincentAccount || '')}
-                </Badge>
-                {userHasVault && (
-                  <Badge variant="default" className="w-fit">
-                    <CheckCircle className="size-3 mr-1" />
-                    Vault Active
-                  </Badge>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshVaultStatus}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="size-4" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
+    <div className="w-full max-w-6xl mx-auto space-y-8">
       {/* Error Display */}
       {error && (
         <Alert variant="destructive" className="border-2">
@@ -457,234 +388,6 @@ export const VaultManager: React.FC = () => {
           <AlertDescription className="font-medium">{error}</AlertDescription>
         </Alert>
       )}
-
-      {/* Warning Notice */}
-      {vaultAddress && vaultAddress === '0x86D54d9c7535b532C8fEE4ec26Fefe923C5e0167' ? (
-        <Alert className="border-2 bg-yellow-50 dark:bg-yellow-950/20">
-          <AlertCircle className="size-5 text-yellow-600" />
-          <AlertDescription className="text-sm">
-            <strong>⚠️ Important:</strong> Your current vault was created with the old contract that
-            doesn't properly track direct token transfers. To see your WETH balance correctly,
-            create a new vault with the updated contract using the button below.
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="border-2 bg-green-50 dark:bg-green-950/20">
-          <CheckCircle className="size-5 text-green-600" />
-          <AlertDescription className="text-sm">
-            <strong>✅ Great!</strong> You're using the latest vault contract with enhanced
-            features: proper balance tracking and withdraw-to-any-address functionality. Use the
-            "Fetch Direct Balances" button to see your current balances.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Debug Info */}
-      <Card className="border-2">
-        <CardContent className="pt-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-4">Debug Info</h3>
-          <div className="text-xs space-y-1 text-muted-foreground">
-            <p>Vincent Account: {vincentAccount || 'None'}</p>
-            <p>User Has Vault: {userHasVault ? 'Yes' : 'No'}</p>
-            <p>Vault Address: {vaultAddress || 'None'}</p>
-            <p>Vault Info: {vaultInfo ? `Owner: ${vaultInfo.owner}` : 'None'}</p>
-            <p>Loading: {loading ? 'Yes' : 'No'}</p>
-            <p>Factory Address: {CONTRACT_ADDRESSES.VaultFactory}</p>
-            <p>WETH Address: {COMMON_TOKENS.WETH}</p>
-            <p>
-              {vaultAddress && vaultAddress !== '0x86D54d9c7535b532C8fEE4ec26Fefe923C5e0167'
-                ? '✅ New vault - should show balances correctly'
-                : '⚠️ Old vault - balances may not show correctly'}
-            </p>
-            <p>🔍 Debug: Check console for detailed contract call logs</p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (vaultAddress && vincentProvider) {
-                    try {
-                      console.log('🔍 Manual WETH balance check for vault:', vaultAddress);
-                      const wethContract = new ethers.Contract(
-                        '0x24fe7807089e321395172633aA9c4bBa4Ac4a357',
-                        ['function balanceOf(address owner) view returns (uint256)'],
-                        vincentProvider
-                      );
-                      const balance = await wethContract.balanceOf(vaultAddress);
-                      console.log('🔍 WETH balance in vault:', balance.toString());
-                      alert(`WETH Balance in Vault: ${ethers.utils.formatEther(balance)} WETH`);
-                    } catch (err) {
-                      console.error('❌ Error checking WETH balance:', err);
-                      alert('Error checking WETH balance. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Check WETH Balance
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (vaultAddress && vincentProvider) {
-                    try {
-                      console.log('🔍 Checking vault supported tokens...');
-                      const vaultContract = new ethers.Contract(
-                        vaultAddress,
-                        ['function getSupportedTokens() external view returns (address[] memory)'],
-                        vincentProvider
-                      );
-                      const supportedTokens = await vaultContract.getSupportedTokens();
-                      console.log('🔍 Supported tokens:', supportedTokens);
-                      alert(`Supported Tokens: ${supportedTokens.length} tokens found`);
-                    } catch (err) {
-                      console.error('❌ Error checking supported tokens:', err);
-                      alert('Error checking supported tokens. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Check Supported Tokens
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (vaultAddress && vincentProvider) {
-                    try {
-                      console.log('🔍 Checking vault internal WETH balance...');
-                      const vaultContract = new ethers.Contract(
-                        vaultAddress,
-                        ['function getBalance(address token) external view returns (uint256)'],
-                        vincentProvider
-                      );
-                      const wethAddress = '0x24fe7807089e321395172633aA9c4bBa4Ac4a357';
-                      const internalBalance = await vaultContract.getBalance(wethAddress);
-                      console.log('🔍 Vault internal WETH balance:', internalBalance.toString());
-                      alert(
-                        `Vault Internal WETH Balance: ${ethers.utils.formatEther(internalBalance)} WETH`
-                      );
-                    } catch (err) {
-                      console.error('❌ Error checking vault internal balance:', err);
-                      alert('Error checking vault internal balance. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Check Vault Internal Balance
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={async () => {
-                  if (vaultAddress && vincentProvider) {
-                    try {
-                      console.log('🔍 Attempting to register existing WETH...');
-                      const wethAddress = '0x24fe7807089e321395172633aA9c4bBa4Ac4a357';
-
-                      // Check current WETH balance in vault
-                      const wethContract = new ethers.Contract(
-                        wethAddress,
-                        ['function balanceOf(address owner) view returns (uint256)'],
-                        vincentProvider
-                      );
-                      const actualBalance = await wethContract.balanceOf(vaultAddress);
-                      console.log('🔍 Actual WETH balance in vault:', actualBalance.toString());
-
-                      if (actualBalance.gt(0)) {
-                        // Register the existing WETH token using the useVault hook
-                        console.log('🔍 Registering WETH token in vault...');
-
-                        await registerExistingTokens(vaultAddress, [wethAddress]);
-
-                        alert(
-                          `Successfully registered ${ethers.utils.formatEther(actualBalance)} WETH in vault! Refresh the page to see the balance.`
-                        );
-                      } else {
-                        alert('No WETH found in vault.');
-                      }
-                    } catch (err) {
-                      console.error('❌ Error registering WETH:', err);
-                      alert('Error registering WETH. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Register Existing WETH
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={async () => {
-                  if (vaultAddress && vincentProvider) {
-                    try {
-                      console.log('🔍 Attempting to register existing USDC-Circle...');
-                      const usdcAddress = COMMON_TOKENS.USDC; // 0x036CbD53842c5426634e7929541eC2318f3dCF7e
-
-                      // Check current USDC balance in vault
-                      const usdcContract = new ethers.Contract(
-                        usdcAddress,
-                        [
-                          'function balanceOf(address owner) view returns (uint256)',
-                          'function decimals() view returns (uint8)',
-                        ],
-                        vincentProvider
-                      );
-                      const [actualBalance, decimals] = await Promise.all([
-                        usdcContract.balanceOf(vaultAddress),
-                        usdcContract.decimals(),
-                      ]);
-                      console.log('🔍 Actual USDC balance in vault:', actualBalance.toString());
-
-                      if (actualBalance.gt(0)) {
-                        // Register the existing USDC token using the useVault hook
-                        console.log('🔍 Registering USDC-Circle token in vault...');
-
-                        await registerExistingTokens(vaultAddress, [usdcAddress]);
-
-                        alert(
-                          `Successfully registered ${ethers.utils.formatUnits(actualBalance, decimals)} USDC-Circle in vault! Refresh the page to see the balance.`
-                        );
-                      } else {
-                        alert('No USDC-Circle found in vault.');
-                      }
-                    } catch (err) {
-                      console.error('❌ Error registering USDC-Circle:', err);
-                      alert('Error registering USDC-Circle. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Register Existing USDC-Circle
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={async () => {
-                  if (
-                    confirm(
-                      "⚠️ This will create a NEW vault with the updated contract. Your old vault will still exist but won't be tracked. Continue?"
-                    )
-                  ) {
-                    try {
-                      console.log('🔍 Creating new vault with updated contract...');
-                      await createVaultWithVincent();
-                      alert(
-                        '✅ New vault created! The old vault is still there but this new one has the balance tracking fix.'
-                      );
-                    } catch (err) {
-                      console.error('❌ Error creating new vault:', err);
-                      alert('Error creating new vault. Check console for details.');
-                    }
-                  }
-                }}
-              >
-                Create New Vault (Updated Contract)
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Create Vault */}
       {!userHasVault && (
@@ -734,319 +437,336 @@ export const VaultManager: React.FC = () => {
 
       {/* Vault Management */}
       {userHasVault && (
-        <Card className="border-2">
-          <CardContent className="pt-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold">Vault Management</h2>
-              <p className="text-sm text-muted-foreground">
-                Manage your vault operations and deposits
-              </p>
-            </div>
-            <Tabs value={view} onValueChange={(value) => setView(value as 'overview')}>
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-6 mt-6">
-                {/* Vault Info */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Vault Information</h3>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={refreshVaultStatus}
-                        disabled={loading}
-                      >
-                        <RefreshCw className="size-4 mr-2" />
-                        Refresh Balances
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(vaultAddress || '')}
-                      >
-                        <Copy className="size-4 mr-2" />
-                        Copy Address
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Vault Address</Label>
-                      <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                        <code className="text-sm">{formatAddress(vaultAddress || '')}</code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(vaultAddress || '')}
-                        >
-                          <Copy className="size-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Owner</Label>
-                      <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                        <code className="text-sm">
-                          {formatAddress(vaultInfo?.owner || 'Loading...')}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(vaultInfo?.owner || '')}
-                        >
-                          <Copy className="size-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+        <Card className="border-2 overflow-hidden rounded-xl">
+          <CardContent className="p-6">
+            {/* Dashboard Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-6 border-b">
+              <div className="space-y-1">
+                <h1 className="flex items-center gap-3 text-2xl font-semibold">
+                  <Wallet className="size-6" />
+                  ViVault Manager
+                </h1>
+                <p className="text-base text-muted-foreground">
+                  Manage your volatility-based portfolio vault with advanced strategies
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Badge variant="secondary" className="w-fit">
+                    Vincent: {formatAddress(vincentAccount || '')}
+                  </Badge>
+                  {userHasVault && (
+                    <Badge variant="default" className="w-fit">
+                      <CheckCircle className="size-3 mr-1" />
+                      Vault Active
+                    </Badge>
+                  )}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshVaultStatus}
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="size-4" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
 
-                {/* Token Management */}
+            <div className="space-y-8">
+              {/* Vault Overview */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <Card className="border-2 overflow-hidden rounded-xl">
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <Wallet className="size-5" />
+                        <span>Vault Overview</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Your vault contains {vaultInfo?.balances?.length || 0} registered tokens
+                      </div>
+                      {valuing ? (
+                        <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+                          <Loader2 className="size-5 animate-spin" />
+                          <span>Calculating value…</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Total Value</span>
+                            <span className="text-lg font-semibold">
+                              ${vaultValue.totalUsdValue.toFixed(2)}
+                            </span>
+                          </div>
+                          {vaultValue.tokenValues.length > 0 && (
+                            <div className="space-y-1">
+                              {vaultValue.tokenValues.map((tv) => (
+                                <div
+                                  key={tv.tokenAddress}
+                                  className="flex items-center justify-between text-sm"
+                                >
+                                  <span>{tv.symbol}</span>
+                                  <span>${tv.usdValue.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  {/* Asset Allocation Pie Chart */}
+                  <Card className="border-2 overflow-hidden rounded-xl">
+                    <CardContent className="space-y-3">
+                      <div className="text-lg font-semibold">Asset Allocation</div>
+                      {vaultValue.tokenValues.length > 0 ? (
+                        <div className="h-56 w-full">
+                          <Pie
+                            data={{
+                              labels: vaultValue.tokenValues.map((t) => t.symbol),
+                              datasets: [
+                                {
+                                  label: 'USD Value',
+                                  data: vaultValue.tokenValues.map((t) =>
+                                    Number(t.usdValue.toFixed(2))
+                                  ),
+                                  // Fixed palette tuned to the app's warm aesthetic
+                                  backgroundColor: [
+                                    '#f59e0b',
+                                    '#fb923c',
+                                    '#f97316',
+                                    '#f43f5e',
+                                    '#22c55e',
+                                    '#3b82f6',
+                                  ],
+                                  borderColor: '#000000',
+                                  borderWidth: 2,
+                                  hoverOffset: 4,
+                                },
+                              ],
+                            }}
+                            options={{
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'bottom',
+                                  labels: { boxWidth: 10, padding: 12, color: '#9ca3af' },
+                                },
+                                tooltip: {
+                                  callbacks: {
+                                    // Explicit any to avoid TS inference issues from chart.js typings
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    label: (ctx: any) =>
+                                      `${ctx.label}: $${Number(ctx.parsed).toLocaleString()}`,
+                                  },
+                                  titleColor: '#111827',
+                                  bodyColor: '#111827',
+                                  backgroundColor: 'rgba(255,255,255,0.95)',
+                                },
+                              },
+                              layout: { padding: 0 },
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground py-8 text-center">
+                          No assets to display
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Token Management</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={refreshVaultStatus}
-                        disabled={loading}
-                      >
-                        <RefreshCw className="size-4 mr-2" />
-                        Refresh Tokens
-                      </Button>
+                  {/* Vault Info Card */}
+                  <Card className="border-2 overflow-hidden rounded-xl">
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <Wallet className="size-5" />
+                        <span>Vault Details</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Address:</span>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                              {vaultAddress
+                                ? `${vaultAddress.slice(0, 6)}...${vaultAddress.slice(-4)}`
+                                : 'N/A'}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => vaultAddress && copyToClipboard(vaultAddress)}
+                            >
+                              <Copy className="size-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Owner:</span>
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {vaultInfo?.owner
+                              ? `${vaultInfo.owner.slice(0, 6)}...${vaultInfo.owner.slice(-4)}`
+                              : 'N/A'}
+                          </code>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Tokens:</span>
+                          <Badge variant="secondary">
+                            {vaultInfo?.balances?.length || 0} tokens
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={refreshVaultStatus}
+                          disabled={loading}
+                          className="w-full"
+                        >
+                          <RefreshCw className="size-4 mr-2" />
+                          Refresh Data
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Quick Actions */}
+                  <Card className="border-2 overflow-hidden rounded-xl">
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <TrendingUp className="size-5" />
+                        <span>Quick Actions</span>
+                      </div>
                       <Button
                         variant="default"
-                        size="sm"
-                        onClick={async () => {
-                          console.log('🔍 Fetching direct balances for vault dashboard...');
-                          console.log('🔍 Current vault address:', vaultAddress);
-                          console.log('🔍 Vincent provider available:', !!vincentProvider);
-
-                          const directBalances = await fetchDirectBalances();
-                          console.log('🔍 Direct balances result:', directBalances);
-
-                          if (directBalances) {
-                            // Update the vault info with the direct balances
-                            setVaultInfo((prev) =>
-                              prev ? { ...prev, balances: directBalances } : null
-                            );
-                            console.log(
-                              '✅ Vault dashboard updated with direct balances:',
-                              directBalances
-                            );
-                            alert(
-                              `✅ Updated vault dashboard with ${directBalances.length} token balances!`
-                            );
-                          } else {
-                            console.log('❌ No balances returned from fetchDirectBalances');
-                            alert('❌ No balances found. Check console for details.');
-                          }
-                        }}
-                        disabled={loading}
-                      >
-                        <RefreshCw className="size-4 mr-2" />
-                        Fetch Direct Balances
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
+                        className="w-full"
                         onClick={() => setSwapPopupOpen(true)}
-                        disabled={loading}
                       >
                         <ArrowUpDown className="size-4 mr-2" />
                         Swap Tokens
                       </Button>
-                    </div>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          // Add deposit functionality
+                        }}
+                      >
+                        <Plus className="size-4 mr-2" />
+                        Deposit Tokens
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleAutoRegisterTokens}
+                        disabled={loading}
+                      >
+                        <RefreshCw className="size-4 mr-2" />
+                        Auto-Register Tokens
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Token Balances Grid */}
+              {vaultInfo?.balances && vaultInfo.balances.length > 0 && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">Token Holdings</h2>
+                    <Badge variant="outline">{vaultInfo.balances.length} tokens</Badge>
                   </div>
 
-                  {/* Token Selector */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="token-selector">Select Token to View</Label>
-                      <Select value={selectedToken} onValueChange={setSelectedToken}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a token to view balance" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Tokens</SelectItem>
-                          {vaultInfo?.balances?.map((balance) => (
-                            <SelectItem key={balance.address} value={balance.address}>
-                              {balance.symbol} ({parseFloat(balance.balance).toFixed(6)})
-                            </SelectItem>
-                          ))}
-                          {Object.entries(customTokens).map(([address, tokenInfo]) => (
-                            <SelectItem key={address} value={address}>
-                              {tokenInfo.symbol} ({tokenInfo.name})
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="custom">Add Custom Token</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Custom Token Input */}
-                    {selectedToken === 'custom' && (
-                      <div className="space-y-2">
-                        <Label htmlFor="custom-token">Custom Token Address</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="custom-token"
-                            placeholder="0x..."
-                            value={customTokenAddress}
-                            onChange={(e) => setCustomTokenAddress(e.target.value)}
-                          />
-                          <Button
-                            variant="outline"
-                            onClick={async () => {
-                              if (customTokenAddress) {
-                                try {
-                                  const tokenInfo = await getTokenInfo(customTokenAddress);
-                                  console.log('Custom token info:', tokenInfo);
-                                  setCustomTokens((prev) => ({
-                                    ...prev,
-                                    [customTokenAddress]: tokenInfo,
-                                  }));
-                                  setSelectedToken(customTokenAddress);
-                                  setCustomTokenAddress('');
-                                } catch (err) {
-                                  console.error('Failed to get token info:', err);
-                                  alert('Invalid token address or token not found');
-                                }
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Token Balance Display */}
-                  <div className="space-y-4">
-                    {selectedToken === 'all' ? (
-                      // Show all tokens
-                      (vaultInfo?.balances?.length || 0) > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {vaultInfo?.balances?.map((balance) => (
-                            <Card key={balance.address} className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-medium">{balance.symbol}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {parseFloat(balance.balance).toFixed(6)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground font-mono">
-                                    {formatAddress(balance.address)}
-                                  </p>
-                                </div>
-                                <Badge variant="secondary">{balance.symbol}</Badge>
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
-                          <AlertCircle className="size-4 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            No tokens deposited yet. Deposit tokens to see balances.
-                          </p>
-                        </div>
-                      )
-                    ) : selectedToken && selectedToken !== 'custom' ? (
-                      // Show selected token
-                      (() => {
-                        const balance = vaultInfo?.balances?.find(
-                          (b) => b.address === selectedToken
-                        );
-                        const customToken = customTokens[selectedToken];
-                        const tokenSymbol = balance?.symbol || customToken?.symbol || 'Unknown';
-                        const tokenName = customToken?.name || tokenSymbol;
-                        const tokenBalance = balance
-                          ? parseFloat(balance.balance).toFixed(6)
-                          : '0.000000';
-                        const tokenDecimals = balance?.decimals || customToken?.decimals || 18;
-
-                        return (
-                          <Card className="p-6">
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h4 className="text-xl font-semibold">{tokenName}</h4>
-                                  <p className="text-2xl font-bold text-primary">{tokenBalance}</p>
-                                  <p className="text-sm text-muted-foreground">{tokenSymbol}</p>
-                                </div>
-                                <Badge variant="default" className="text-lg px-3 py-1">
-                                  {tokenSymbol}
-                                </Badge>
-                              </div>
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium">Token Address</Label>
-                                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                                  <code className="text-sm">{selectedToken}</code>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => copyToClipboard(selectedToken)}
-                                  >
-                                    <Copy className="size-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button className="flex-1">
-                                  <Plus className="size-4 mr-2" />
-                                  Deposit
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    handleWithdrawClick({
-                                      address: selectedToken,
-                                      symbol: tokenSymbol,
-                                      balance: tokenBalance,
-                                      decimals: tokenDecimals,
-                                    })
-                                  }
-                                >
-                                  Withdraw
-                                </Button>
-                              </div>
-                              {/* Swap Button - only show for WETH or USDC-Circle */}
-                              {(selectedToken === COMMON_TOKENS.WETH ||
-                                selectedToken === COMMON_TOKENS.USDC) && (
-                                <Button
-                                  variant="secondary"
-                                  className="w-full"
-                                  onClick={() => setSwapPopupOpen(true)}
-                                >
-                                  <ArrowUpDown className="size-4 mr-2" />
-                                  Swap {tokenSymbol}
-                                </Button>
-                              )}
-                            </div>
-                          </Card>
-                        );
-                      })()
-                    ) : (
-                      <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
-                        <AlertCircle className="size-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          Please select a token to view its balance and details.
-                        </p>
-                      </div>
-                    )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {vaultInfo.balances.map((balance) => (
+                      <Card key={balance.address} className="border-2 overflow-hidden rounded-xl">
+                        <CardContent className="space-y-2">
+                          <div className="text-base font-semibold">{balance.symbol}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {ethers.utils.formatUnits(balance.balance, balance.decimals)}{' '}
+                            {balance.symbol}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                handleWithdrawClick({
+                                  address: balance.address,
+                                  symbol: balance.symbol,
+                                  balance: ethers.utils.formatUnits(
+                                    balance.balance,
+                                    balance.decimals
+                                  ),
+                                  decimals: balance.decimals,
+                                });
+                              }}
+                              className="flex-1"
+                            >
+                              Withdraw
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSwapPopupOpen(true)}
+                              className="flex-1"
+                            >
+                              Swap
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
+              )}
+
+              {/* Empty State */}
+              {(!vaultInfo?.balances || vaultInfo.balances.length === 0) && !loading && (
+                <Card className="border-2">
+                  <CardContent className="pt-6">
+                    <div className="text-center py-12">
+                      <Wallet className="size-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="text-lg font-semibold mb-2">No Tokens in Vault</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Your vault might have tokens that aren't registered yet. Try
+                        auto-registering them first.
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        <Button
+                          onClick={handleAutoRegisterTokens}
+                          className="px-6"
+                          disabled={loading}
+                        >
+                          <RefreshCw className="size-4 mr-2" />
+                          Auto-Register Tokens
+                        </Button>
+                        <Button variant="outline" onClick={() => setSwapPopupOpen(true)}>
+                          <ArrowUpDown className="size-4 mr-2" />
+                          Swap Tokens
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            // Add deposit functionality
+                            console.log('Deposit clicked');
+                          }}
+                        >
+                          <Plus className="size-4 mr-2" />
+                          Deposit
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

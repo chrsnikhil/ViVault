@@ -61,6 +61,7 @@
     "@lit-protocol/contracts-sdk": "^7.3.0",
     "@lit-protocol/lit-node-client": "^7.3.0",
     "@privy-io/react-auth": "^3.3.0",
+    "@pythnetwork/hermes-client": "^2.0.0",
     "consola": "^3.2.3",
     "dotenv": "^17.2.3",
     "ethers": "^5.8.0",

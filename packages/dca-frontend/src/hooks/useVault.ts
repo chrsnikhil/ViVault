@@ -262,82 +262,44 @@ export const useVault = () => {
   const getVaultInfo = useCallback(
     async (vaultAddress: string): Promise<VaultInfo> => {
       try {
-        console.log('🔍 getVaultInfo: Starting with address:', vaultAddress);
         const vault = getUserVault(vaultAddress);
-        console.log('🔍 getVaultInfo: Vault contract created');
 
-        console.log('🔍 getVaultInfo: Getting vault info...');
-        console.log('🔍 getVaultInfo: Vault contract address:', vaultAddress);
-        console.log('🔍 getVaultInfo: Vault contract instance:', vault);
-
-        // Test individual calls first
-        // Test if contract exists by checking code
-        console.log('🔍 getVaultInfo: Testing contract code...');
         if (!vincentProvider) {
           throw new Error('Vincent provider not available');
         }
 
-        // Test RPC connection first
-        console.log('🔍 getVaultInfo: Testing RPC connection...');
-        const blockNumber = await vincentProvider.getBlockNumber();
-        console.log('🔍 getVaultInfo: Current block number:', blockNumber);
-
         const code = await vincentProvider.getCode(vaultAddress);
-        console.log('🔍 getVaultInfo: Contract code length:', code.length);
         if (code === '0x') {
           throw new Error('No contract found at this address');
         }
 
-        console.log('🔍 getVaultInfo: Testing owner() call...');
         const ownerTest = await vault.owner();
-        console.log('🔍 getVaultInfo: Owner test result:', ownerTest);
-
-        console.log('🔍 getVaultInfo: Testing factory() call...');
         const factoryTest = await vault.factory();
-        console.log('🔍 getVaultInfo: Factory test result:', factoryTest);
 
         // Try getVaultInfo() first, fallback to individual calls if it fails
-        let ownerFromContract, factoryFromContract, tokenCount, totalValue;
+        let ownerFromContract, factoryFromContract, tokenCount;
         try {
-          console.log('🔍 getVaultInfo: Testing getVaultInfo() call...');
-          [ownerFromContract, factoryFromContract, tokenCount, totalValue] =
-            await vault.getVaultInfo();
-          console.log('🔍 getVaultInfo: getVaultInfo() call successful');
-        } catch (getVaultInfoError) {
-          console.log(
-            '🔍 getVaultInfo: getVaultInfo() call failed, using individual calls:',
-            getVaultInfoError
-          );
+          [ownerFromContract, factoryFromContract, tokenCount] = await vault.getVaultInfo();
+        } catch {
           // Fallback to individual calls
           ownerFromContract = ownerTest;
           factoryFromContract = factoryTest;
           tokenCount = await vault.getSupportedTokenCount();
-          totalValue = 0; // Placeholder
         }
 
-        console.log('🔍 getVaultInfo: Owner from contract:', ownerFromContract);
-        console.log('🔍 getVaultInfo: Factory from contract:', factoryFromContract);
-        console.log('🔍 getVaultInfo: Token count:', tokenCount.toString());
-        console.log('🔍 getVaultInfo: Total value:', totalValue.toString());
-
-        console.log('🔍 getVaultInfo: Getting supported tokens...');
         let supportedTokens = [];
         try {
           supportedTokens = await vault.getSupportedTokens();
-          console.log('🔍 getVaultInfo: Supported tokens:', supportedTokens);
-        } catch (supportedTokensError) {
-          console.log('🔍 getVaultInfo: getSupportedTokens() call failed:', supportedTokensError);
+        } catch {
           supportedTokens = [];
         }
 
-        console.log('🔍 getVaultInfo: Getting balances with NEW contract logic...');
         let balancesRaw = [];
         let tokensToCheck = [];
 
         try {
           // First, get the supported tokens from the vault
           const supportedTokens = await vault.getSupportedTokens();
-          console.log('🔍 getVaultInfo: Supported tokens from vault:', supportedTokens);
 
           // If vault has supported tokens, use those; otherwise check common tokens
           if (supportedTokens.length > 0) {
@@ -347,13 +309,9 @@ export const useVault = () => {
             tokensToCheck = Object.values(COMMON_TOKENS);
           }
 
-          console.log('🔍 getVaultInfo: Tokens to check for balances:', tokensToCheck);
-
           // NEW: The updated contract's getBalances() now returns actual token balances
           balancesRaw = await vault.getBalances(tokensToCheck);
-          console.log('🔍 getVaultInfo: Raw balances (actual token balances):', balancesRaw);
-        } catch (balancesError) {
-          console.log('🔍 getVaultInfo: getBalances() call failed:', balancesError);
+        } catch {
           balancesRaw = [];
           tokensToCheck = Object.values(COMMON_TOKENS); // Fallback to common tokens
         }
@@ -363,20 +321,14 @@ export const useVault = () => {
             try {
               const erc20 = getERC20Contract(tokenAddress);
               const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
+              const rawBalance = balancesRaw[index]?.toString() || '0';
               return {
                 address: tokenAddress,
                 symbol: symbol,
-                balance: (
-                  parseFloat(balancesRaw[index]?.toString() || '0') /
-                  10 ** decimals
-                ).toString(),
+                balance: rawBalance, // Keep raw balance in wei
                 decimals: decimals,
               };
-            } catch (tokenError) {
-              console.log(
-                `🔍 getVaultInfo: Error getting info for token ${tokenAddress}:`,
-                tokenError
-              );
+            } catch {
               return {
                 address: tokenAddress,
                 symbol: 'UNK',
@@ -386,7 +338,6 @@ export const useVault = () => {
             }
           })
         );
-        console.log('🔍 getVaultInfo: Processed balances:', balances);
 
         const result = {
           address: vaultAddress,
@@ -396,10 +347,8 @@ export const useVault = () => {
           supportedTokens,
           tokenCount: tokenCount.toNumber(),
         };
-        console.log('🔍 getVaultInfo: Final result:', result);
 
         // Auto-register common tokens in background (don't wait for it)
-
         autoRegisterCommonTokens(vaultAddress).catch((error) => {
           console.warn('⚠️ Background auto-registration failed:', error);
         });
@@ -503,7 +452,7 @@ export const useVault = () => {
     [authInfo?.pkp.ethAddress, authInfo?.jwt]
   );
 
-  // Register existing tokens in vault (requires Vincent Ability)
+  // Register existing tokens in vault
   const registerExistingTokens = useCallback(
     async (vaultAddress: string, tokenAddresses: string[]): Promise<void> => {
       if (!authInfo?.pkp.ethAddress) {
@@ -520,55 +469,40 @@ export const useVault = () => {
         );
       }
 
-      setLoading(true);
-      setError(null);
+      if (tokenAddresses.length === 0) {
+        console.log('🔍 No tokens to register');
+        return;
+      }
 
       try {
-        console.log('🔍 ===== REGISTER TOKENS TRANSACTION DEBUG INFO =====');
-        console.log('🔍 Registering tokens with Vincent PKP wallet:', authInfo.pkp.ethAddress);
-        console.log('🔍 Vault address:', vaultAddress);
-        console.log('🔍 Token addresses:', tokenAddresses);
-        console.log('🔍 ================================================');
+        console.log('🔍 Registering existing tokens:', tokenAddresses);
 
-        // Create Vincent signer with EVM Transaction Signer Ability
         const vincentSigner = new VincentSigner(
-          'https://sepolia.base.org', // Base Sepolia RPC
+          'https://sepolia.base.org',
           authInfo.pkp.ethAddress,
           env.VITE_DELEGATEE_PRIVATE_KEY,
           authInfo.jwt
         );
 
-        // Create vault contract instance with Vincent signer
         const vault = vincentSigner.createContract(vaultAddress, USER_VAULT_ABI);
 
-        // Send registerExistingTokens transaction using Vincent PKP with EVM Transaction Signer Ability
-        console.log('🔍 Sending registerExistingTokens transaction with Vincent PKP...');
-        const tx = await vincentSigner.sendContractTransaction(
-          vault,
-          'registerExistingTokens',
-          tokenAddresses
-        );
-        console.log('🔍 Register tokens transaction sent:', tx.hash);
+        const tx = await vincentSigner.sendContractTransaction(vault, 'registerExistingTokens', [
+          tokenAddresses,
+        ]);
+        console.log('🔍 Registration transaction sent:', tx.hash);
 
-        // Wait for transaction confirmation
-        const receipt = await tx.wait();
-        console.log('🔍 Register tokens transaction confirmed:', receipt);
-
-        console.log('✅ Tokens registered successfully with Vincent PKP');
+        await tx.wait();
+        console.log('✅ Tokens registered successfully');
       } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Failed to register tokens with Vincent PKP';
-        console.error('❌ Error registering tokens with Vincent PKP:', err);
-        setError(errorMessage);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to register tokens';
+        console.error('❌ Error registering tokens:', err);
         throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
       }
     },
     [authInfo?.pkp.ethAddress, authInfo?.jwt]
   );
 
-  // Auto-register common tokens if they exist in vault but aren't registered
+  // Auto-register tokens that have balances but aren't registered
   const autoRegisterCommonTokens = useCallback(
     async (vaultAddress: string): Promise<void> => {
       if (!vincentProvider || !authInfo?.pkp.ethAddress || !authInfo?.jwt) {
@@ -576,13 +510,24 @@ export const useVault = () => {
       }
 
       try {
-        console.log('🔍 Auto-checking for unregistered common tokens...');
+        // Check common tokens first, then any other tokens that might have balances
+        const tokensToCheck = [
+          COMMON_TOKENS.WETH,
+          COMMON_TOKENS.USDC,
+          // Add any other tokens you want to check
+        ];
 
-        // Check if common tokens exist in vault but aren't registered
-        const commonTokens = [COMMON_TOKENS.WETH, COMMON_TOKENS.USDC];
         const tokensToRegister: string[] = [];
 
-        for (const tokenAddress of commonTokens) {
+        // Get currently supported tokens to avoid re-registering
+        const vaultContract = new ethers.Contract(
+          vaultAddress,
+          ['function getSupportedTokens() external view returns (address[] memory)'],
+          vincentProvider
+        );
+        const supportedTokens = await vaultContract.getSupportedTokens();
+
+        for (const tokenAddress of tokensToCheck) {
           try {
             // Check if token has balance in vault
             const tokenContract = new ethers.Contract(
@@ -593,17 +538,8 @@ export const useVault = () => {
             const balance = await tokenContract.balanceOf(vaultAddress);
 
             if (balance.gt(0)) {
-              // Check if token is already registered
-              const vaultContract = new ethers.Contract(
-                vaultAddress,
-                ['function getSupportedTokens() external view returns (address[] memory)'],
-                vincentProvider
-              );
-              const supportedTokens = await vaultContract.getSupportedTokens();
-
               if (!supportedTokens.includes(tokenAddress)) {
                 tokensToRegister.push(tokenAddress);
-                console.log('🔍 Found unregistered token with balance:', tokenAddress);
               }
             }
           } catch (tokenError) {
@@ -613,12 +549,10 @@ export const useVault = () => {
 
         // Register tokens that have balances but aren't registered
         if (tokensToRegister.length > 0) {
-          console.log('🔍 Auto-registering tokens with balances:', tokensToRegister);
           await registerExistingTokens(vaultAddress, tokensToRegister);
-          console.log('✅ Auto-registered tokens with balances');
         }
       } catch (error) {
-        console.warn('⚠️ Failed to auto-register common tokens:', error);
+        console.warn('⚠️ Failed to auto-register tokens:', error);
         // Don't throw - this is a background operation
       }
     },
