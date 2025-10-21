@@ -162,13 +162,27 @@ async function fetchHistoricalPrices(feedId: string, weeks: number = 12): Promis
         const data = await response.json();
 
         if (data.parsed && data.parsed.length > 0) {
-          const { price: priceData } = data.parsed[0];
+          const parsedItem = data.parsed[0];
+          const { price: priceData } = parsedItem;
+
+          // Normalize feed IDs for comparison (remove/add 0x prefix as needed)
+          const normalizedRequestedId = feedId.startsWith('0x') ? feedId.slice(2) : feedId;
+          const normalizedApiId = parsedItem.id.startsWith('0x')
+            ? parsedItem.id.slice(2)
+            : parsedItem.id;
+
+          // Verify the feed ID matches what we requested
+          if (normalizedApiId !== normalizedRequestedId) {
+            consola.warn(`⚠️ Feed ID mismatch! Requested: ${feedId}, Got: ${parsedItem.id}`);
+            return null;
+          }
+
           if (priceData) {
             const { expo, price } = priceData;
             const adjustedPrice = parseFloat(price) * 10 ** expo;
 
             consola.info(
-              `📈 Historical price at ${new Date(timestamp * 1000).toISOString()}: $${adjustedPrice.toFixed(2)} (raw: ${price}, expo: ${expo})`
+              `📈 Historical price for ${feedId} at ${new Date(timestamp * 1000).toISOString()}: $${adjustedPrice.toFixed(2)} (raw: ${price}, expo: ${expo})`
             );
             return adjustedPrice;
           }
@@ -207,6 +221,8 @@ async function fetchHistoricalPrices(feedId: string, weeks: number = 12): Promis
     consola.info(
       `📊 Price range: $${Math.min(...prices).toFixed(2)} - $${Math.max(...prices).toFixed(2)}`
     );
+    consola.info(`📊 All prices: [${prices.map((p) => p.toFixed(2)).join(', ')}]`);
+    consola.info(`📊 Feed ID: ${feedId}`);
     return prices;
   } catch (error) {
     consola.error('❌ Error fetching historical prices from Pyth Benchmarks:', error);
@@ -262,10 +278,9 @@ function calculateVolatility(prices: number[]): number {
   // Convert to basis points (raw volatility, not annualized)
   const volatilityBps = Math.round(stdDev * 10000);
 
-  // Apply reasonable bounds for weekly crypto volatility (1-1000 basis points = 0.01% to 10%)
+  // Only apply minimum bound to avoid zero volatility
   const minVolatility = 1; // 0.01% minimum
-  const maxVolatility = 1000; // 10% maximum (realistic for weekly crypto volatility)
-  const finalVolatility = Math.max(Math.min(volatilityBps, maxVolatility), minVolatility);
+  const finalVolatility = Math.max(volatilityBps, minVolatility);
 
   consola.info(
     `📈 Final volatility: ${finalVolatility} basis points (${(finalVolatility / 100).toFixed(2)}%)`
@@ -332,7 +347,7 @@ async function updateVolatilityForFeed(
 
     // Get current gas price and increase it to avoid replacement fee issues
     const gasPrice = await provider.getGasPrice();
-    const increasedGasPrice = gasPrice.mul(150).div(100); // 50% higher gas price for better reliability
+    const increasedGasPrice = gasPrice.mul(200).div(100); // 100% higher gas price for better reliability
 
     const tx = await contract.updateVolatility(priceUpdate, feedId, volatilityBps, {
       gasLimit: gasEstimate.mul(150).div(100), // 50% higher gas limit for better reliability
@@ -384,8 +399,12 @@ export async function updateVolatilityIndex(): Promise<void> {
       { id: PRICE_FEED_IDS.USDC_USD, name: 'USDC/USD' },
     ];
 
-    const updatePromises = feeds.map(async (feed) => {
+    // Process feeds sequentially with delays to avoid transaction conflicts
+    const results = await feeds.reduce(async (accPromise, feed, index) => {
+      const acc = await accPromise;
+
       try {
+        consola.info(`🔄 Processing ${feed.name} (${index + 1}/${feeds.length})`);
         await updateVolatilityForFeed(
           provider,
           signer,
@@ -393,32 +412,40 @@ export async function updateVolatilityIndex(): Promise<void> {
           feed.id,
           feed.name
         );
-        return { feed: feed.name, success: true };
+        acc.push({ feed: feed.name, success: true });
+
+        // Add delay between transactions to avoid conflicts (except for last one)
+        if (index < feeds.length - 1) {
+          consola.info(`⏳ Waiting 3 seconds before next update...`);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 3000);
+          });
+        }
       } catch (error) {
         if (error instanceof Error && error.message.includes('insufficient funds')) {
           consola.warn(`⚠️ Skipping ${feed.name} due to insufficient funds`);
-          return { error: 'insufficient funds', feed: feed.name, success: false };
-        }
-        if (error instanceof Error && error.message.includes('Empty price update')) {
+          acc.push({ error: 'insufficient funds', feed: feed.name, success: false });
+        } else if (error instanceof Error && error.message.includes('Empty price update')) {
           consola.warn(`⚠️ Skipping ${feed.name} due to empty price update`);
-          return { error: 'empty price update', feed: feed.name, success: false };
+          acc.push({ error: 'empty price update', feed: feed.name, success: false });
+        } else if (error instanceof Error && error.message.includes('replacement fee too low')) {
+          consola.warn(`⚠️ Skipping ${feed.name} due to replacement fee too low`);
+          acc.push({ error: 'replacement fee too low', feed: feed.name, success: false });
+        } else {
+          consola.error(`❌ ${feed.name} failed:`, error);
+          acc.push({ error: error.message, feed: feed.name, success: false });
         }
-        throw error;
       }
-    });
 
-    const results = await Promise.allSettled(updatePromises);
+      return acc;
+    }, Promise.resolve([]));
 
     // Log results
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        if (result.value.success) {
-          consola.success(`✅ ${result.value.feed} updated successfully`);
-        } else {
-          consola.warn(`⚠️ ${result.value.feed} skipped: ${result.value.error}`);
-        }
+    results.forEach((result) => {
+      if (result.success) {
+        consola.success(`✅ ${result.feed} updated successfully`);
       } else {
-        consola.error(`❌ ${feeds[index].name} failed:`, result.reason);
+        consola.warn(`⚠️ ${result.feed} skipped: ${result.error}`);
       }
     });
 

@@ -276,7 +276,7 @@ export function VolatilityIndexCard() {
             <h3 className="text-lg font-semibold flex items-center gap-2">
               Volatility Index
               {isUpdating && (
-                <div className="flex items-center gap-1 text-blue-600">
+                <div className="flex items-center gap-1 text-black">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Updating...</span>
                 </div>
@@ -301,18 +301,6 @@ export function VolatilityIndexCard() {
               <RefreshCw className={`size-4 ${data.isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
-
-          {/* Countdown Timer */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="size-4" />
-            <span>
-              {isUpdating ? (
-                <span className="text-blue-600 font-medium">Updating now...</span>
-              ) : (
-                `Next update in: ${formatTimeRemaining(timeUntilNextUpdate)}`
-              )}
-            </span>
-          </div>
         </div>
         {data.error && (
           <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -329,14 +317,28 @@ export function VolatilityIndexCard() {
           <TokenRow symbol="USDC" data={data.USDC} isLoading={data.isLoading} />
         </div>
 
-        {data.lastUpdate > 0 && (
-          <div className="flex items-center gap-2 pt-2 border-t">
-            <Clock className="size-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              Last updated: {formatLastUpdate(data.lastUpdate)}
+        {/* Bottom status bar - Last updated on left, Next update on right */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          {/* Last updated - bottom left */}
+          {data.lastUpdate > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="size-4" />
+              <span>Last updated: {formatLastUpdate(data.lastUpdate)}</span>
+            </div>
+          )}
+
+          {/* Next update - bottom right */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="size-4" />
+            <span>
+              {isUpdating ? (
+                <span className="text-black font-medium">Updating now...</span>
+              ) : (
+                `Next update in: ${formatTimeRemaining(timeUntilNextUpdate)}`
+              )}
             </span>
           </div>
-        )}
+        </div>
 
         {!data.WETH && !data.USDC && !data.isLoading && !data.error && (
           <div className="text-center py-6 text-muted-foreground">
