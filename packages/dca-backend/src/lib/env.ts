@@ -31,7 +31,7 @@ export const env = createEnv({
     CORS_ALLOWED_DOMAIN: z.string().url(),
     DEFAULT_TX_CONFIRMATIONS: z.coerce.number().default(6),
     IS_DEVELOPMENT: BooleanOrBooleanStringSchema,
-    MONGODB_URI: z.string().url(),
+    // MONGODB_URI: z.string().url(), // Not needed anymore
     PORT: z.coerce.number(),
     PRIVATE_KEY: z.string(),
     PYTH_HERMES_URL: z.string().url().default('https://hermes.pyth.network'),

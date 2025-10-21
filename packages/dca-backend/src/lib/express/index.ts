@@ -6,11 +6,12 @@ import helmet from 'helmet';
 import { createVincentUserMiddleware } from '@lit-protocol/vincent-app-sdk/expressMiddleware';
 import { getAppInfo, getPKPInfo, isAppUser } from '@lit-protocol/vincent-app-sdk/jwt';
 
-import { updateVolatilityIndex } from '../volatilityWorker';
 // DCA-specific routes removed - keeping only Vincent authentication
 import { userKey, VincentAuthenticatedRequest } from './types';
 import { env } from '../env';
+import { getTimerStatus } from '../jobWorker';
 import { serviceLogger } from '../logger';
+import { updateVolatilityIndex } from '../volatilityWorker';
 
 const { ALLOWED_AUDIENCE, CORS_ALLOWED_DOMAIN, IS_DEVELOPMENT, VINCENT_APP_ID } = env;
 
@@ -112,6 +113,23 @@ export const registerRoutes = (app: Express) => {
       res.status(500).json({
         error: error instanceof Error ? error.message : 'Unknown error',
         message: 'Test volatility update failed',
+        success: false,
+      });
+    }
+  });
+
+  // Timer status endpoint
+  app.get('/volatility-timer-status', (req, res) => {
+    try {
+      const timerStatus = getTimerStatus();
+      res.json({
+        data: timerStatus,
+        success: true,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to get timer status',
+        message: error instanceof Error ? error.message : 'Unknown error',
         success: false,
       });
     }

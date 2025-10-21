@@ -4,7 +4,7 @@ import express from 'express';
 import { env } from './env';
 import { registerRoutes } from './express';
 import { serviceLogger } from './logger';
-import { connectToMongoDB } from './mongo/mongoose';
+// import { connectToMongoDB } from './mongo/mongoose'; // Not needed anymore
 
 const app = express();
 
@@ -12,11 +12,10 @@ registerRoutes(app);
 
 Sentry.setupExpressErrorHandler(app);
 
-const { MONGODB_URI, PORT } = env;
+const { PORT } = env;
 
 const startApiServer = async () => {
-  await connectToMongoDB(MONGODB_URI);
-  serviceLogger.info('Mongo is connected. Starting server...');
+  serviceLogger.info('Starting server without MongoDB...');
 
   await new Promise((resolve, reject) => {
     // The `listen` method launches a web server.

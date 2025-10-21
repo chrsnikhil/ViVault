@@ -1,12 +1,12 @@
 import '../lib/sentry';
 import { startApiServer } from '../lib/apiServer';
-import { startWorker } from '../lib/jobWorker';
+// import { startVolatilityTimer } from '../lib/jobWorker'; // Not needed - frontend controls timer now
 import { serviceLogger } from '../lib/logger';
 
 async function gogo() {
   try {
-    await startWorker();
-    serviceLogger.info('Agenda is ready');
+    // Volatility timer is now controlled by the frontend
+    serviceLogger.info('Backend ready - volatility timer controlled by frontend');
 
     await startApiServer();
   } catch (error) {
