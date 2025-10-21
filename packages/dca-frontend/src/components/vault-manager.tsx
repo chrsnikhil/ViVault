@@ -87,51 +87,27 @@ export const VaultManager: React.FC = () => {
   const fetchLatestPrices = useCallback(async (): Promise<
     Array<{ id: string; symbol: string; price: number; confidence: number; publishTime: number }>
   > => {
-    const PYTH_PRICE_IDS = [
-      '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD
-      '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a', // USDC/USD
+    // Use mock prices for now to avoid CORS issues with Pyth API
+    // TODO: Create a proper price endpoint in the backend
+    const mockPrices = [
+      {
+        id: '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+        symbol: 'WETH',
+        price: 3880.5, // Mock WETH price
+        confidence: 0.01,
+        publishTime: Math.floor(Date.now() / 1000),
+      },
+      {
+        id: '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
+        symbol: 'USDC',
+        price: 1.0, // Mock USDC price
+        confidence: 0.001,
+        publishTime: Math.floor(Date.now() / 1000),
+      },
     ];
-    const SYMBOLS = ['WETH', 'USDC'];
-    const proxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://thingproxy.freeboard.io/fetch/',
-    ];
-    const targetUrl = `https://hermes.pyth.network/v2/updates/price/latest?${PYTH_PRICE_IDS.map((id) => `ids[]=${id}`).join('&')}`;
 
-    let lastError: unknown = null;
-    for (const proxy of proxies) {
-      try {
-        const url = `${proxy}${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(url, { headers: { Accept: 'application/json' } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data && data.parsed && Array.isArray(data.parsed)) {
-          const newPrices = data.parsed.map(
-            (update: { price: { price: string; expo: number; conf: string } }, index: number) => {
-              const symbol = SYMBOLS[index] || 'UNKNOWN';
-              const rawPrice = parseFloat(update.price.price);
-              const expo = update.price.expo;
-              let price = rawPrice * Math.pow(10, expo);
-              const confidence = parseFloat(update.price.conf) * Math.pow(10, expo);
-              // Guard against exponent issues on WETH
-              if (symbol === 'WETH' && price > 10000) price = rawPrice;
-              return {
-                id: update.id as string,
-                symbol,
-                price,
-                confidence,
-                publishTime: update.price.publish_time as number,
-              };
-            }
-          );
-          return newPrices;
-        }
-      } catch (e) {
-        lastError = e;
-        continue;
-      }
-    }
-    throw lastError ?? new Error('Failed to fetch prices');
+    console.log('📊 Using mock prices for vault display:', mockPrices);
+    return mockPrices;
   }, []);
 
   // Recalculate vault value when balances change
