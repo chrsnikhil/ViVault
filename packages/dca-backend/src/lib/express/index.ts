@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { createVincentUserMiddleware } from '@lit-protocol/vincent-app-sdk/expressMiddleware';
 import { getAppInfo, getPKPInfo, isAppUser } from '@lit-protocol/vincent-app-sdk/jwt';
 
+import { updateVolatilityIndex } from '../volatilityWorker';
 // DCA-specific routes removed - keeping only Vincent authentication
 import { userKey, VincentAuthenticatedRequest } from './types';
 import { env } from '../env';
@@ -70,6 +71,51 @@ export const registerRoutes = (app: Express) => {
       });
     })
   );
+
+  // Manual volatility update trigger endpoint (with authentication)
+  app.post(
+    '/trigger-volatility-update',
+    middleware,
+    setSentryUserMiddleware,
+    handler(async (req: VincentAuthenticatedRequest, res) => {
+      try {
+        serviceLogger.info('Manual volatility update triggered by user');
+        await updateVolatilityIndex();
+        res.json({
+          message: 'Volatility update completed successfully',
+          success: true,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        serviceLogger.error('Manual volatility update failed:', error);
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Unknown error',
+          message: 'Volatility update failed',
+          success: false,
+        });
+      }
+    })
+  );
+
+  // Test endpoint without authentication for debugging
+  app.post('/test-volatility-update', async (req, res) => {
+    try {
+      serviceLogger.info('Test volatility update triggered');
+      await updateVolatilityIndex();
+      res.json({
+        message: 'Test volatility update completed successfully',
+        success: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      serviceLogger.error('Test volatility update failed:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'Test volatility update failed',
+        success: false,
+      });
+    }
+  });
 
   serviceLogger.info(`Routes registered`);
 };

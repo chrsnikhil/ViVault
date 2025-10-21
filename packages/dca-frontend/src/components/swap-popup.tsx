@@ -17,9 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpDown, Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import {
+  ArrowUpDown,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  ExternalLink,
+  TrendingUp,
+  Zap,
+  ArrowRight,
+} from 'lucide-react';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
-import { VincentUniswapSwapService, type SwapParams } from '@/lib/vincent-uniswap-swap';
+import {
+  VincentUniswapSwapService,
+  type SwapParams,
+  type SwapRoute,
+} from '@/lib/vincent-uniswap-swap';
 import { COMMON_TOKENS, USER_VAULT_ABI, ERC20_ABI } from '@/config/contracts';
 import { VincentSigner } from '@/lib/vincent-signer';
 import { env } from '@/config/env';
@@ -74,8 +87,17 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
   const [tokenOutInfo, setTokenOutInfo] = useState<TokenInfo | null>(null);
   const [ethBalance, setEthBalance] = useState<string>('0');
 
+  // Route discovery
+  const [routes, setRoutes] = useState<SwapRoute[]>([]);
+  const [discoveringRoutes, setDiscoveringRoutes] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState<SwapRoute | null>(null);
+  const [routesPopupOpen, setRoutesPopupOpen] = useState(false);
+  const [showAllRoutes, setShowAllRoutes] = useState(false);
+
   // Service
-  const [swapService] = useState(() => new VincentUniswapSwapService());
+  const [swapService] = useState(
+    () => new VincentUniswapSwapService('https://base-sepolia.public.blastapi.io')
+  );
 
   // Normalize symbols to improve matching (e.g., "Wrapped Ether" -> "weth", "USDC-Circle" -> "usdc")
   const normalizeSymbol = useCallback((s?: string) => {
@@ -87,22 +109,29 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     return lower.replace(/[^a-z0-9]/g, '');
   }, []);
 
-  // Available tokens for swapping (WETH to USDC-Circle)
+  // Available tokens for swapping on Base Sepolia
   const availableTokens = useMemo(
     () => [
-      { address: COMMON_TOKENS.WETH, symbol: 'WETH', decimals: 18 },
-      { address: COMMON_TOKENS.USDC, symbol: 'USDC-Circle', decimals: 6 },
+      { address: COMMON_TOKENS.WETH, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+      { address: COMMON_TOKENS.USDC, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+      { address: COMMON_TOKENS.LINK, symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+      { address: COMMON_TOKENS.DAI, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+      { address: COMMON_TOKENS.USDT, symbol: 'USDT', decimals: 6, name: 'Tether USD' },
     ],
     []
   );
 
   const loadBalances = useCallback(async () => {
-    if (!authInfo?.pkp.ethAddress) return;
+    if (!authInfo?.pkp.ethAddress) {
+      console.log('🔍 SwapPopup: No PKP address available');
+      return;
+    }
 
     try {
       console.log('🔍 SwapPopup: Loading balances...');
       console.log('🔍 SwapPopup: Vault address:', vaultAddress);
       console.log('🔍 SwapPopup: Vault balances:', vaultBalances);
+      console.log('🔍 SwapPopup: Auth info:', authInfo);
 
       // Load ETH balance from wallet (for gas)
       const ethBal = await swapService.getEthBalance(authInfo.pkp.ethAddress);
@@ -116,16 +145,29 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
           // Get balance from vault
           if (vaultBalances && vaultAddress) {
+            console.log('🔍 SwapPopup: Searching for tokenIn in vault balances...');
+            console.log('🔍 SwapPopup: Looking for address:', tokenIn);
+            console.log(
+              '🔍 SwapPopup: Available vault balances:',
+              vaultBalances.map((b) => ({
+                address: b.address,
+                symbol: b.symbol,
+                balance: b.balance,
+              }))
+            );
+
             // Prefer exact address match; fallback to same-symbol match
             let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
             if (!vb) {
               const targetSym = normalizeSymbol(tokenInData.symbol);
+              console.log(
+                '🔍 SwapPopup: No exact address match, trying symbol match for:',
+                targetSym
+              );
               vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
             }
             if (vb) {
               balance = vb.balance;
-              // Track the actual vault-held address for use in contract calls
-              setTokenInResolved(vb.address);
               console.log(
                 '🔍 SwapPopup: Using vault balance for',
                 tokenInData.symbol,
@@ -135,6 +177,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             } else {
               console.log('🔍 SwapPopup: Token not found in vault:', tokenInData.symbol);
             }
+          } else {
+            console.log('🔍 SwapPopup: No vault balances or vault address available');
           }
 
           setTokenInInfo({
@@ -153,15 +197,21 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
           // Get balance from vault
           if (vaultBalances && vaultAddress) {
+            console.log('🔍 SwapPopup: Searching for tokenOut in vault balances...');
+            console.log('🔍 SwapPopup: Looking for address:', tokenOut);
+
             // Prefer exact address match; fallback to same-symbol match
             let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
             if (!vb) {
               const targetSym = normalizeSymbol(tokenOutData.symbol);
+              console.log(
+                '🔍 SwapPopup: No exact address match, trying symbol match for:',
+                targetSym
+              );
               vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
             }
             if (vb) {
               balance = vb.balance;
-              setTokenOutResolved(vb.address);
               console.log(
                 '🔍 SwapPopup: Using vault balance for',
                 tokenOutData.symbol,
@@ -171,6 +221,8 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             } else {
               console.log('🔍 SwapPopup: Token not found in vault:', tokenOutData.symbol);
             }
+          } else {
+            console.log('🔍 SwapPopup: No vault balances or vault address available for tokenOut');
           }
 
           setTokenOutInfo({
@@ -200,15 +252,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     if (isOpen && authInfo?.pkp.ethAddress) {
       loadBalances();
     }
-  }, [
-    isOpen,
-    authInfo?.pkp.ethAddress,
-    tokenIn,
-    tokenOut,
-    vaultBalances,
-    vaultAddress,
-    loadBalances,
-  ]);
+  }, [isOpen, authInfo, tokenIn, tokenOut, vaultBalances, vaultAddress, loadBalances]);
 
   const handleSwapTokens = () => {
     const temp = tokenIn;
@@ -222,6 +266,48 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
       const formattedBalance = ethers.utils.formatUnits(tokenInInfo.balance, tokenInInfo.decimals);
       setAmountIn(formattedBalance);
     }
+  };
+
+  const discoverRoutes = async () => {
+    if (!amountIn || parseFloat(amountIn) <= 0) {
+      setError('Please enter an amount to discover routes');
+      return;
+    }
+
+    setDiscoveringRoutes(true);
+    setError(null);
+
+    try {
+      console.log('🔍 Discovering routes for:', tokenIn, '->', tokenOut, 'Amount:', amountIn);
+      console.log('🔍 Using RPC URL:', swapService['rpcUrl']);
+
+      const discoveredRoutes = await swapService.findSwapRoutes(tokenIn, tokenOut, amountIn);
+      console.log('🔍 Discovered routes:', discoveredRoutes);
+
+      setRoutes(discoveredRoutes);
+
+      // Auto-select the best route (first one, as they're sorted by expected output)
+      if (discoveredRoutes.length > 0) {
+        setSelectedRoute(discoveredRoutes[0]);
+        console.log('🔍 Auto-selected best route:', discoveredRoutes[0]);
+      }
+
+      // Open the routes popup
+      setRoutesPopupOpen(true);
+
+      console.log('✅ Found routes:', discoveredRoutes.length);
+    } catch (error) {
+      console.error('❌ Error discovering routes:', error);
+      setError(
+        `Failed to discover routes: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setDiscoveringRoutes(false);
+    }
+  };
+
+  const selectRoute = (route: SwapRoute) => {
+    setSelectedRoute(route);
   };
 
   const handleSwap = async () => {
@@ -607,7 +693,10 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
               <SelectContent>
                 {availableTokens.map((token) => (
                   <SelectItem key={token.address} value={token.address}>
-                    {token.symbol}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{token.symbol}</span>
+                      <span className="text-muted-foreground text-sm">({token.name})</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -660,7 +749,10 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
               <SelectContent>
                 {availableTokens.map((token) => (
                   <SelectItem key={token.address} value={token.address}>
-                    {token.symbol}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{token.symbol}</span>
+                      <span className="text-muted-foreground text-sm">({token.name})</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -697,6 +789,53 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             ETH Balance (for gas): {parseFloat(ethBalance).toFixed(6)} ETH
           </div>
 
+          {/* Route Discovery Button */}
+          <Button
+            variant="outline"
+            onClick={discoverRoutes}
+            disabled={discoveringRoutes || !tokenIn || !tokenOut || !amountIn}
+            className="w-full"
+          >
+            {discoveringRoutes ? (
+              <>
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Discovering Routes...
+              </>
+            ) : (
+              '🔍 Discover Available Routes'
+            )}
+          </Button>
+
+          {/* View Routes Button */}
+          {routes.length > 0 && (
+            <Button variant="secondary" onClick={() => setRoutesPopupOpen(true)} className="w-full">
+              📊 View {routes.length} Available Routes
+            </Button>
+          )}
+
+          {/* Selected Route Info */}
+          {selectedRoute && (
+            <div className="p-3 border rounded-lg bg-primary/5 border-primary/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-primary">Selected Route</span>
+                <span className="text-xs text-muted-foreground">
+                  {selectedRoute.routeType === 'direct' ? 'Direct' : 'Multi-hop'}
+                </span>
+              </div>
+              <div className="text-sm">
+                Expected Output:{' '}
+                <span className="font-medium">
+                  {parseFloat(selectedRoute.expectedOutput).toFixed(6)}{' '}
+                  {tokenOutInfo?.symbol || 'TOKENS'}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Price Impact: {selectedRoute.priceImpact.toFixed(2)}% | Gas:{' '}
+                {selectedRoute.gasEstimate}
+              </div>
+            </div>
+          )}
+
           {/* Swap Button */}
           <Button
             onClick={handleSwap}
@@ -717,8 +856,9 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
           <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
             <CheckCircle className="size-4 text-green-600" />
             <AlertDescription className="text-sm">
-              <strong>✅ WETH ↔ USDC-Circle Swap Available:</strong>
+              <strong>✅ Multi-Token Swaps Available:</strong>
               <ul className="mt-2 space-y-1">
+                <li>• WETH, USDC, LINK, DAI, USDT supported</li>
                 <li>• Swaps tokens from your vault</li>
                 <li>• Uses Uniswap V3 on Base Sepolia</li>
                 <li>• Test with small amounts first</li>
@@ -728,6 +868,206 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
           </Alert>
         </div>
       </DialogContent>
+
+      {/* Routes Discovery Popup */}
+      <Dialog open={routesPopupOpen} onOpenChange={setRoutesPopupOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden w-full">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              🔍 Available Swap Routes
+              <span className="text-sm font-normal text-muted-foreground">
+                ({routes.length} routes found)
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              Discovered routes for swapping {tokenInInfo?.symbol || 'Token'} to{' '}
+              {tokenOutInfo?.symbol || 'Token'}
+              {amountIn && ` (Amount: ${amountIn})`}
+              <br />
+              <span className="text-xs text-muted-foreground">
+                Note: Not all token pairs may have liquidity on Uniswap V3
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden min-w-0">
+            <div className="h-full overflow-y-auto">
+              <div className="space-y-3 pr-1 min-w-0">
+                {routes.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <div className="text-4xl mb-4">🔍</div>
+                    <h3 className="text-lg font-medium mb-2">No Routes Found</h3>
+                    <p>No available swap routes found for this token pair on Uniswap V3.</p>
+                  </div>
+                ) : (
+                  (showAllRoutes ? routes : routes.slice(0, 5)).map((route, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 border rounded-lg space-y-3 cursor-pointer transition-all hover:shadow-md ${
+                        selectedRoute === route
+                          ? 'border-primary bg-primary/5 shadow-md'
+                          : 'bg-muted/30 hover:bg-muted/50'
+                      }`}
+                      onClick={() => {
+                        selectRoute(route);
+                        setRoutesPopupOpen(false);
+                      }}
+                    >
+                      {/* Header with badges */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            {route.routeType === 'direct' ? (
+                              <Zap className="size-4 text-blue-600 flex-shrink-0" />
+                            ) : (
+                              <TrendingUp className="size-4 text-purple-600 flex-shrink-0" />
+                            )}
+                            <span className="text-base font-semibold whitespace-nowrap">
+                              Route #{index + 1}
+                            </span>
+                          </div>
+
+                          {/* Badges */}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {selectedRoute === route && (
+                              <span className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground font-medium">
+                                Selected
+                              </span>
+                            )}
+                            <span
+                              className={`px-2 py-1 text-xs rounded-md font-medium ${
+                                route.routeType === 'direct'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
+                              }`}
+                            >
+                              {route.routeType === 'direct' ? 'Direct' : 'Multi-hop'}
+                            </span>
+                            {index === 0 && (
+                              <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700 border border-green-200 font-medium">
+                                Best
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Output amount */}
+                        <div className="text-right min-w-0 flex-shrink-0">
+                          <div className="text-lg font-bold truncate max-w-[120px]">
+                            {parseFloat(route.expectedOutput).toFixed(2)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {tokenOutInfo?.symbol || 'TOKENS'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-muted-foreground mb-2">
+                            Swap Path
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {route.path.map((token, i) => {
+                              const tokenSymbol =
+                                token === tokenIn
+                                  ? tokenInInfo?.symbol
+                                  : token === tokenOut
+                                    ? tokenOutInfo?.symbol
+                                    : 'UNK';
+                              return (
+                                <React.Fragment key={i}>
+                                  <span className="px-2 py-1 bg-muted rounded text-xs font-medium whitespace-nowrap">
+                                    {tokenSymbol}
+                                  </span>
+                                  {i < route.path.length - 1 && (
+                                    <ArrowRight className="size-3 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                              Price Impact
+                            </div>
+                            <div className="text-sm font-semibold">
+                              {route.priceImpact.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                              Gas Estimate
+                            </div>
+                            <div className="text-sm font-semibold">
+                              {parseInt(route.gasEstimate).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                          Pools Used
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {route.pools.map((pool, i) => (
+                            <div
+                              key={i}
+                              className="px-2 py-1 bg-muted rounded text-xs font-medium whitespace-nowrap"
+                            >
+                              {pool.token0Symbol || 'UNK'}/{pool.token1Symbol || 'UNK'}
+                              <span className="ml-1 text-muted-foreground">
+                                ({pool.fee / 10000}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Show More Button */}
+                {routes.length > 5 && !showAllRoutes && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllRoutes(true)}
+                      className="text-sm"
+                    >
+                      Show All {routes.length} Routes
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 flex justify-between items-center pt-4 border-t mt-4">
+            <div className="text-sm text-muted-foreground">
+              {selectedRoute && (
+                <span>
+                  Selected: Route #{routes.indexOf(selectedRoute) + 1}(
+                  {selectedRoute.routeType === 'direct' ? 'Direct' : 'Multi-hop'})
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setRoutesPopupOpen(false)}>
+                Close
+              </Button>
+              {selectedRoute && (
+                <Button onClick={() => setRoutesPopupOpen(false)}>Use Selected Route</Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

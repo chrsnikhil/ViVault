@@ -33,8 +33,13 @@ export const env = createEnv({
     IS_DEVELOPMENT: BooleanOrBooleanStringSchema,
     MONGODB_URI: z.string().url(),
     PORT: z.coerce.number(),
+    PRIVATE_KEY: z.string(),
+    PYTH_HERMES_URL: z.string().url().default('https://hermes.pyth.network'),
     SENTRY_DSN: z.string().optional(),
     VINCENT_APP_ID: z.coerce.number(),
     VINCENT_DELEGATEE_PRIVATE_KEY: z.string(),
+    VOLATILITY_INDEX_CONTRACT_ADDRESS: z
+      .string()
+      .default('0x7a98960bd77870A3aa12fC038611b43443b30e43'),
   },
 });

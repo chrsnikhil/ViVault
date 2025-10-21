@@ -1,9 +1,10 @@
 import type { HardhatUserConfig } from 'hardhat/config';
-import hardhatToolboxMochaEthers from '@nomicfoundation/hardhat-toolbox-mocha-ethers';
+import '@nomicfoundation/hardhat-toolbox-mocha-ethers';
 import HardhatIgnitionEthersPlugin from '@nomicfoundation/hardhat-ignition-ethers';
+import 'dotenv/config';
 
 const hardhatConfig: HardhatUserConfig = {
-  plugins: [hardhatToolboxMochaEthers, HardhatIgnitionEthersPlugin],
+  plugins: [HardhatIgnitionEthersPlugin],
   solidity: {
     profiles: {
       default: {

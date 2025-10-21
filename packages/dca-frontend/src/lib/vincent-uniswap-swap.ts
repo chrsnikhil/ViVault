@@ -26,6 +26,29 @@ export interface SwapResult {
   spendTxHash?: string;
 }
 
+export interface PoolInfo {
+  address: string;
+  token0: string;
+  token1: string;
+  fee: number;
+  liquidity: string;
+  sqrtPriceX96: string;
+  tick: number;
+  token0Symbol?: string;
+  token1Symbol?: string;
+  token0Decimals?: number;
+  token1Decimals?: number;
+}
+
+export interface SwapRoute {
+  pools: PoolInfo[];
+  path: string[];
+  expectedOutput: string;
+  priceImpact: number;
+  gasEstimate: string;
+  routeType: 'direct' | 'multi-hop';
+}
+
 export class VincentUniswapSwapService {
   private litNodeClient: LitNodeClient;
   private delegateeSigner: ethers.Wallet;
@@ -36,8 +59,23 @@ export class VincentUniswapSwapService {
   private readonly UNISWAP_FACTORY = '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24';
   private readonly UNISWAP_ROUTER = '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4';
 
+  // Uniswap V3 Pool ABI for route discovery
+  private readonly POOL_ABI = [
+    'function token0() external view returns (address)',
+    'function token1() external view returns (address)',
+    'function fee() external view returns (uint24)',
+    'function liquidity() external view returns (uint128)',
+    'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
+  ];
+
+  // ERC20 ABI for token info
+  private readonly ERC20_ABI = [
+    'function symbol() external view returns (string)',
+    'function decimals() external view returns (uint8)',
+  ];
+
   constructor(
-    rpcUrl: string = 'https://sepolia.base.org', // Base Sepolia for Uniswap V3
+    rpcUrl: string = 'https://base-sepolia.public.blastapi.io', // Base Sepolia for Uniswap V3
     delegateePrivateKey: string = env.VITE_DELEGATEE_PRIVATE_KEY
   ) {
     this.rpcUrl = rpcUrl;
@@ -303,6 +341,282 @@ export class VincentUniswapSwapService {
       throw new Error(
         `Failed to get ETH balance: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    }
+  }
+
+  /** Discover all available Uniswap V3 pools for a given token pair */
+  async discoverPools(tokenA: string, tokenB: string): Promise<PoolInfo[]> {
+    console.log('🔍 ===== DISCOVERING UNISWAP V3 POOLS =====');
+    console.log('🔍 Token A:', tokenA);
+    console.log('🔍 Token B:', tokenB);
+    console.log('🔍 RPC URL:', this.rpcUrl);
+    console.log('🔍 ======================================');
+
+    const pools: PoolInfo[] = [];
+    const fees = [500, 3000, 10000]; // 0.05%, 0.3%, 1% fee tiers
+
+    try {
+      const factoryContract = new ethers.Contract(
+        this.UNISWAP_FACTORY,
+        [
+          'function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)',
+        ],
+        this.provider
+      );
+
+      // Check each fee tier for both token orders
+      for (const fee of fees) {
+        try {
+          // Check A -> B
+          const poolAddressAB = await factoryContract.getPool(tokenA, tokenB, fee);
+          if (poolAddressAB !== ethers.constants.AddressZero) {
+            console.log(`🔍 Found pool for fee ${fee} (A->B):`, poolAddressAB);
+            const poolInfo = await this.getPoolInfo(poolAddressAB, tokenA, tokenB);
+            if (poolInfo) pools.push(poolInfo);
+          }
+
+          // Check B -> A
+          const poolAddressBA = await factoryContract.getPool(tokenB, tokenA, fee);
+          if (poolAddressBA !== ethers.constants.AddressZero && poolAddressBA !== poolAddressAB) {
+            console.log(`🔍 Found pool for fee ${fee} (B->A):`, poolAddressBA);
+            const poolInfo = await this.getPoolInfo(poolAddressBA, tokenB, tokenA);
+            if (poolInfo) pools.push(poolInfo);
+          }
+        } catch (error) {
+          console.warn(`❌ Failed to check fee tier ${fee}:`, error);
+          continue;
+        }
+      }
+
+      console.log(`✅ Found ${pools.length} pools`);
+      return pools;
+    } catch (error) {
+      console.error('❌ Error discovering pools:', error);
+      throw new Error(
+        `Failed to discover pools: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /** Get detailed information about a specific pool */
+  private async getPoolInfo(
+    poolAddress: string,
+    token0: string,
+    token1: string
+  ): Promise<PoolInfo | null> {
+    try {
+      const poolContract = new ethers.Contract(poolAddress, this.POOL_ABI, this.provider);
+
+      const [fee, liquidity, slot0] = await Promise.all([
+        poolContract.fee(),
+        poolContract.liquidity(),
+        poolContract.slot0(),
+      ]);
+
+      // Get token symbols and decimals
+      const [token0Symbol, token0Decimals, token1Symbol, token1Decimals] = await Promise.all([
+        this.getTokenSymbol(token0),
+        this.getTokenDecimals(token0),
+        this.getTokenSymbol(token1),
+        this.getTokenDecimals(token1),
+      ]);
+
+      return {
+        address: poolAddress,
+        token0,
+        token1,
+        fee: typeof fee === 'number' ? fee : fee.toNumber(),
+        liquidity: liquidity.toString(),
+        sqrtPriceX96: slot0.sqrtPriceX96.toString(),
+        tick: slot0.tick,
+        token0Symbol,
+        token1Symbol,
+        token0Decimals,
+        token1Decimals,
+      };
+    } catch (error) {
+      console.warn(`❌ Failed to get pool info for ${poolAddress}:`, error);
+      return null;
+    }
+  }
+
+  /** Get token symbol */
+  private async getTokenSymbol(tokenAddress: string): Promise<string> {
+    try {
+      const tokenContract = new ethers.Contract(tokenAddress, this.ERC20_ABI, this.provider);
+      return await tokenContract.symbol();
+    } catch {
+      return 'UNK';
+    }
+  }
+
+  /** Get token decimals */
+  private async getTokenDecimals(tokenAddress: string): Promise<number> {
+    try {
+      const tokenContract = new ethers.Contract(tokenAddress, this.ERC20_ABI, this.provider);
+      return await tokenContract.decimals();
+    } catch {
+      return 18; // Default to 18 decimals
+    }
+  }
+
+  /** Find all possible swap routes between two tokens */
+  async findSwapRoutes(tokenIn: string, tokenOut: string, amountIn: string): Promise<SwapRoute[]> {
+    console.log('🔍 ===== FINDING SWAP ROUTES =====');
+    console.log('🔍 Token In:', tokenIn);
+    console.log('🔍 Token Out:', tokenOut);
+    console.log('🔍 Amount In:', amountIn);
+    console.log('🔍 ===============================');
+
+    try {
+      // First, discover all pools
+      const pools = await this.discoverPools(tokenIn, tokenOut);
+
+      if (pools.length === 0) {
+        console.log('❌ No pools found for this token pair');
+        return [];
+      }
+
+      const routes: SwapRoute[] = [];
+
+      // Find direct routes
+      for (const pool of pools) {
+        if (
+          (pool.token0.toLowerCase() === tokenIn.toLowerCase() &&
+            pool.token1.toLowerCase() === tokenOut.toLowerCase()) ||
+          (pool.token1.toLowerCase() === tokenIn.toLowerCase() &&
+            pool.token0.toLowerCase() === tokenOut.toLowerCase())
+        ) {
+          const route = await this.calculateDirectRoute(pool, tokenIn, tokenOut, amountIn);
+          if (route) routes.push(route);
+        }
+      }
+
+      // Find multi-hop routes (through common tokens like WETH, USDC, LINK, DAI)
+      const commonTokens = [
+        '0x4200000000000000000000000000000000000006', // WETH
+        '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+        '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C8e7d5', // LINK
+        '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', // DAI
+      ];
+
+      for (const intermediateToken of commonTokens) {
+        if (
+          intermediateToken.toLowerCase() === tokenIn.toLowerCase() ||
+          intermediateToken.toLowerCase() === tokenOut.toLowerCase()
+        ) {
+          continue;
+        }
+
+        const firstHopPools = pools.filter(
+          (pool) =>
+            (pool.token0.toLowerCase() === tokenIn.toLowerCase() &&
+              pool.token1.toLowerCase() === intermediateToken.toLowerCase()) ||
+            (pool.token1.toLowerCase() === tokenIn.toLowerCase() &&
+              pool.token0.toLowerCase() === intermediateToken.toLowerCase())
+        );
+
+        const secondHopPools = await this.discoverPools(intermediateToken, tokenOut);
+
+        for (const firstPool of firstHopPools) {
+          for (const secondPool of secondHopPools) {
+            const route = await this.calculateMultiHopRoute(
+              [firstPool, secondPool],
+              tokenIn,
+              tokenOut,
+              amountIn
+            );
+            if (route) routes.push(route);
+          }
+        }
+      }
+
+      // Sort routes by expected output (best first)
+      routes.sort((a, b) => parseFloat(b.expectedOutput) - parseFloat(a.expectedOutput));
+
+      console.log(`✅ Found ${routes.length} routes`);
+      return routes;
+    } catch (error) {
+      console.error('❌ Error finding swap routes:', error);
+      throw new Error(
+        `Failed to find swap routes: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /** Calculate direct route through a single pool */
+  private async calculateDirectRoute(
+    pool: PoolInfo,
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string
+  ): Promise<SwapRoute | null> {
+    try {
+      // This is a simplified calculation - in production you'd want to use the Uniswap SDK
+      // for accurate price calculations
+      const amountInWei = ethers.utils.parseUnits(
+        amountIn,
+        pool.token0.toLowerCase() === tokenIn.toLowerCase()
+          ? pool.token0Decimals
+          : pool.token1Decimals
+      );
+
+      // Simplified output calculation (this is not accurate, just for demonstration)
+      const expectedOutput = ethers.utils.formatUnits(
+        amountInWei.mul(95).div(100),
+        pool.token1.toLowerCase() === tokenOut.toLowerCase()
+          ? pool.token1Decimals
+          : pool.token0Decimals
+      );
+
+      return {
+        pools: [pool],
+        path: [tokenIn, tokenOut],
+        expectedOutput,
+        priceImpact: 0.5, // Simplified
+        gasEstimate: '150000', // Estimated gas
+        routeType: 'direct',
+      };
+    } catch (error) {
+      console.warn('❌ Failed to calculate direct route:', error);
+      return null;
+    }
+  }
+
+  /** Calculate multi-hop route through multiple pools */
+  private async calculateMultiHopRoute(
+    pools: PoolInfo[],
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string
+  ): Promise<SwapRoute | null> {
+    try {
+      // Simplified multi-hop calculation
+      const path = [tokenIn];
+      for (let i = 0; i < pools.length - 1; i++) {
+        const pool = pools[i];
+        const nextToken =
+          pool.token0.toLowerCase() === path[path.length - 1].toLowerCase()
+            ? pool.token1
+            : pool.token0;
+        path.push(nextToken);
+      }
+      path.push(tokenOut);
+
+      const amountInWei = ethers.utils.parseUnits(amountIn, 18); // Simplified
+      const expectedOutput = ethers.utils.formatUnits(amountInWei.mul(90).div(100), 6); // Simplified
+
+      return {
+        pools,
+        path,
+        expectedOutput,
+        priceImpact: 1.0, // Higher impact for multi-hop
+        gasEstimate: '200000', // Higher gas for multi-hop
+        routeType: 'multi-hop',
+      };
+    } catch (error) {
+      console.warn('❌ Failed to calculate multi-hop route:', error);
+      return null;
     }
   }
 }

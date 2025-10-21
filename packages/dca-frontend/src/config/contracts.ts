@@ -10,8 +10,55 @@ export const COMMON_TOKENS = {
   WETH: '0x4200000000000000000000000000000000000006', // WETH on Base Sepolia (official address)
   USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC-Circle on Base Sepolia (has Uniswap pools)
   USDC_OLD: '0x8a04d904055528a69f3e4594dda308a31aeb8457', // Old USDC Testnet (no pools)
+  LINK: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C8e7d5', // Chainlink token on Base Sepolia
+  DAI: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', // DAI on Base Sepolia
+  USDT: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', // USDT on Base Sepolia (same as DAI for testing)
   // Note: USDC-Circle has actual Uniswap V3 liquidity on Base Sepolia
 };
+
+// Token metadata for display
+export const TOKEN_METADATA = {
+  [COMMON_TOKENS.WETH]: { symbol: 'WETH', name: 'Wrapped Ether', decimals: 18 },
+  [COMMON_TOKENS.USDC]: { symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+  [COMMON_TOKENS.LINK]: { symbol: 'LINK', name: 'Chainlink', decimals: 18 },
+  [COMMON_TOKENS.DAI]: { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 },
+  [COMMON_TOKENS.USDT]: { symbol: 'USDT', name: 'Tether USD', decimals: 6 },
+};
+
+// Helper function to get token info by address
+export const getTokenInfo = (address: string) => {
+  return (
+    TOKEN_METADATA[address as keyof typeof TOKEN_METADATA] || {
+      symbol: 'UNK',
+      name: 'Unknown Token',
+      decimals: 18,
+    }
+  );
+};
+
+// VolatilityIndex contract configuration
+export const VOLATILITY_INDEX = {
+  // Contract address deployed on Base Sepolia
+  ADDRESS: '0x7a98960bd77870A3aa12fC038611b43443b30e43',
+  ABI: [
+    'function getVolatilityData(bytes32 priceFeedId) external view returns (tuple(uint256 volatilityBps, uint256 price, uint256 timestamp, uint256 confidence))',
+    'function getVolatility(bytes32 priceFeedId) external view returns (uint256)',
+    'function getCurrentPrice(bytes32 priceFeedId) external view returns (uint256)',
+    'function getLastUpdate(bytes32 priceFeedId) external view returns (uint256)',
+    'function getSupportedFeeds() external view returns (bytes32[])',
+    'function isSupported(bytes32 priceFeedId) external view returns (bool)',
+    'event VolatilityUpdated(bytes32 indexed priceFeedId, uint256 volatilityBps, uint256 price, uint256 timestamp, uint256 confidence)',
+  ],
+};
+
+// Pyth price feed IDs for Base Sepolia
+export const PYTH_PRICE_FEED_IDS = {
+  WETH_USD: '0x9d4294bbcd1174d6f2003ec365831e64cc31d9f6f15a2b85399db8d5000960f6',
+  USDC_USD: '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
+} as const;
+
+// Pyth contract address on Base Sepolia
+export const PYTH_CONTRACT_ADDRESS = '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729';
 
 // Minimal ABI for VaultFactory
 export const VAULT_FACTORY_ABI = [

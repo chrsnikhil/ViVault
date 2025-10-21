@@ -32,6 +32,7 @@ import { ethers } from 'ethers';
 import { PriceCalculator, type TokenValue } from '@/lib/price-calculator';
 import { WithdrawPopup } from '@/components/withdraw-popup';
 import { SwapPopup } from '@/components/swap-popup';
+import { VolatilityIndexCard } from '@/components/volatility-index-card';
 import {
   Dialog,
   DialogContent,
@@ -708,6 +709,9 @@ export const VaultManager: React.FC = () => {
                   </Card>
                 </div>
               </div>
+
+              {/* Volatility Index */}
+              <VolatilityIndexCard />
 
               {/* Token Balances Grid */}
               {vaultInfo?.balances && vaultInfo.balances.length > 0 && (
