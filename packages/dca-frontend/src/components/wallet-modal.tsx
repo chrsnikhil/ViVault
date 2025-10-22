@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ethers } from 'ethers';
-import { LogOut, RefreshCcw, Copy, Check, WalletIcon } from 'lucide-react';
+import { LogOut, RefreshCcw, Copy, Check, WalletIcon, Plus } from 'lucide-react';
 
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Spinner } from '@/components/ui/spinner';
 import { env } from '@/config/env';
 import { useChain } from '@/hooks/useChain';
+import { VincentDepositPopup } from '@/components/vincent-deposit-popup';
 
 const { VITE_APP_ID } = env;
 
@@ -31,6 +32,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [depositPopupOpen, setDepositPopupOpen] = useState(false);
   const { authInfo, logOut } = useJwtContext();
 
   // Function to fetch PKP balances
@@ -206,6 +208,15 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
 
             <Button
               className="w-full h-11"
+              variant="default"
+              size="default"
+              onClick={() => setDepositPopupOpen(true)}
+            >
+              <Plus className="size-4 mr-2" /> Deposit to Vincent Wallet
+            </Button>
+
+            <Button
+              className="w-full h-11"
               variant="outline"
               size="default"
               onClick={() =>
@@ -229,6 +240,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
           </div>
         </div>
       </DialogContent>
+
+      {/* Vincent Deposit Popup */}
+      <VincentDepositPopup isOpen={depositPopupOpen} onClose={() => setDepositPopupOpen(false)} />
     </Dialog>
   );
 };

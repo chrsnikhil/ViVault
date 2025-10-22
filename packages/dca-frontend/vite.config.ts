@@ -47,15 +47,6 @@ export default defineConfig(({ command, mode }) => {
           ]
         : []),
     ],
-    server: {
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
-      },
-    },
     define: {
       global: 'globalThis',
       'process.env': {},

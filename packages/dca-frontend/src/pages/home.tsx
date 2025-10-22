@@ -93,9 +93,9 @@ export const Home: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="size-8 rounded-md border bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-semibold text-sm">ML</span>
+                          <span className="text-primary font-semibold text-sm">VV</span>
                         </div>
-                        <span className="text-foreground font-semibold text-lg">MicroLend</span>
+                        <span className="text-foreground font-semibold text-lg">ViVault</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Button size="sm" variant="outline" onClick={() => setCurrentPage('home')}>
@@ -183,9 +183,9 @@ export const Home: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="size-8 rounded-md border bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-semibold text-sm">ML</span>
+                          <span className="text-primary font-semibold text-sm">VV</span>
                         </div>
-                        <span className="text-foreground font-semibold text-lg">MicroLend</span>
+                        <span className="text-foreground font-semibold text-lg">ViVault</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -227,22 +227,23 @@ export const Home: React.FC = () => {
         <section className="mx-auto max-w-7xl px-6 pt-20 pb-16 md:pt-24 md:pb-20">
           <motion.div className="max-w-3xl" variants={fadeInUp}>
             <Badge variant="secondary" className="mb-4">
-              <Clock className="size-3 mr-1" />
-              Fast approvals
+              <TrendingUp className="size-3 mr-1" />
+              Live volatility tracking
             </Badge>
             <h1 className="text-foreground text-balance text-4xl md:text-6xl font-semibold leading-tight mb-6">
-              Fast, fair microloans to grow your business
+              ViVault: Smart DeFi Vault Management
             </h1>
             <p className="text-muted-foreground text-lg leading-relaxed mb-8 max-w-2xl">
-              Get approved in minutes, access funds quickly, and repay on a schedule that fits your
-              cash flow. No hidden fees, transparent terms.
+              Automated volatility-based portfolio management with real-time price feeds,
+              intelligent rebalancing, and transparent on-chain execution. Built on Base with Pyth
+              oracles.
             </p>
             <div className="flex flex-wrap items-center gap-4">
               <Button
                 size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
-                Get started
+                Launch Vault
                 <ArrowRight className="size-4 ml-2" />
               </Button>
               <Button
@@ -250,7 +251,7 @@ export const Home: React.FC = () => {
                 variant="outline"
                 className="border-input hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
-                How it works
+                View Analytics
               </Button>
             </div>
           </motion.div>
@@ -443,7 +444,7 @@ export const Home: React.FC = () => {
             variants={fadeInUp}
           >
             <p className="text-muted-foreground text-sm">
-              © {new Date().getFullYear()} MicroLend. All rights reserved.
+              © {new Date().getFullYear()} ViVault. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <Button

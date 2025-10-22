@@ -588,6 +588,91 @@ export const useVault = () => {
     [authInfo?.pkp.ethAddress, authInfo?.jwt, registerExistingTokens, getWorkingProvider]
   );
 
+  // Deposit tokens to vault
+  const deposit = useCallback(
+    async (
+      vaultAddress: string,
+      tokenAddress: string,
+      amount: string,
+      decimals: number
+    ): Promise<void> => {
+      if (!authInfo?.pkp.ethAddress) {
+        throw new Error('No Vincent PKP wallet connected');
+      }
+
+      if (!authInfo?.jwt) {
+        throw new Error('No Vincent JWT available. Please re-authenticate.');
+      }
+
+      if (!env.VITE_DELEGATEE_PRIVATE_KEY) {
+        throw new Error(
+          'Delegatee private key not configured. Please add VITE_DELEGATEE_PRIVATE_KEY to your .env file'
+        );
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log('💰 Depositing tokens to vault...', {
+          vaultAddress,
+          tokenAddress,
+          amount,
+          decimals,
+        });
+
+        // Create Vincent signer with EVM Transaction Signer Ability
+        const vincentSigner = new VincentSigner(
+          'https://sepolia.base.org', // Base Sepolia RPC
+          authInfo.pkp.ethAddress,
+          env.VITE_DELEGATEE_PRIVATE_KEY,
+          authInfo.jwt
+        );
+
+        // Create contract instances with Vincent signer
+        const vaultContract = vincentSigner.createContract(vaultAddress, USER_VAULT_ABI);
+        const tokenContract = vincentSigner.createContract(tokenAddress, ERC20_ABI);
+
+        const amountWei = ethers.utils.parseUnits(amount, decimals);
+
+        // Check current allowance
+        const currentAllowance = await tokenContract.allowance(
+          authInfo.pkp.ethAddress,
+          vaultAddress
+        );
+
+        if (currentAllowance.lt(amountWei)) {
+          console.log('🔓 Approving token spending...');
+          const approveTx = await vincentSigner.sendContractTransaction(
+            tokenContract,
+            'approve',
+            vaultAddress,
+            amountWei
+          );
+          console.log('✅ Token approval confirmed:', approveTx.hash);
+        }
+
+        // Execute deposit
+        console.log('💰 Executing deposit transaction...');
+        const depositTx = await vincentSigner.sendContractTransaction(
+          vaultContract,
+          'deposit',
+          tokenAddress,
+          amountWei
+        );
+
+        console.log('✅ Deposit successful!', depositTx.hash);
+      } catch (error: unknown) {
+        console.error('❌ Deposit failed:', error);
+        setError(error instanceof Error ? error.message : 'Deposit failed');
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authInfo?.pkp.ethAddress, authInfo?.jwt]
+  );
+
   return {
     loading,
     error,
@@ -599,5 +684,6 @@ export const useVault = () => {
     withdraw,
     registerExistingTokens,
     autoRegisterCommonTokens,
+    deposit,
   };
 };

@@ -28,49 +28,40 @@ export function VolatilityIndexCard() {
   const [timeUntilNextUpdate, setTimeUntilNextUpdate] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Frontend-controlled timer (10 minutes)
+  // Frontend-controlled timer (10 minutes) - Tab-resistant
   useEffect(() => {
-    let timerInterval: NodeJS.Timeout | null = null;
     let countdownInterval: NodeJS.Timeout | null = null;
     let hasTriggered = false; // Prevent multiple triggers
+    let startTime = Date.now(); // Track actual start time
 
     const startTimer = () => {
       console.log('⏰ Starting 10-minute timer...');
+      startTime = Date.now(); // Reset start time
 
       // Set initial countdown to 600 seconds (10 minutes)
       setTimeUntilNextUpdate(600);
 
-      // Update countdown every second
+      // Update countdown every second - but calculate based on actual elapsed time
       countdownInterval = setInterval(() => {
-        setTimeUntilNextUpdate((prev) => {
-          const newSeconds = prev - 1;
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(0, 600 - elapsed);
 
-          // Show updating state when within 5 seconds
-          if (newSeconds <= 5) {
-            setIsUpdating(true);
-          } else {
-            setIsUpdating(false);
-          }
+        setTimeUntilNextUpdate(remaining);
 
-          // Trigger update when timer reaches 0 (only once)
-          if (newSeconds === 0 && !hasTriggered) {
-            hasTriggered = true;
-            console.log('🔄 Timer reached 0, triggering automatic update...');
-            triggerAutomaticUpdate();
-          }
+        // Show updating state when within 5 seconds
+        if (remaining <= 5) {
+          setIsUpdating(true);
+        } else {
+          setIsUpdating(false);
+        }
 
-          return Math.max(0, newSeconds);
-        });
-      }, 1000);
-
-      // Set timer to trigger the update after 600 seconds
-      timerInterval = setTimeout(() => {
-        if (!hasTriggered) {
+        // Trigger update when timer reaches 0 (only once)
+        if (remaining === 0 && !hasTriggered) {
           hasTriggered = true;
-          console.log('🔄 Timer timeout triggered automatic update');
+          console.log('🔄 Timer reached 0, triggering automatic update...');
           triggerAutomaticUpdate();
         }
-      }, 600000); // 600 seconds = 10 minutes
+      }, 1000);
     };
 
     const triggerAutomaticUpdate = async () => {
@@ -112,8 +103,7 @@ export function VolatilityIndexCard() {
       } finally {
         setIsUpdating(false);
 
-        // Clear existing timers
-        if (timerInterval) clearTimeout(timerInterval);
+        // Clear existing timer
         if (countdownInterval) clearInterval(countdownInterval);
 
         // Restart the timer for the next cycle
@@ -128,7 +118,6 @@ export function VolatilityIndexCard() {
     startTimer();
 
     return () => {
-      if (timerInterval) clearTimeout(timerInterval);
       if (countdownInterval) clearInterval(countdownInterval);
     };
   }, [sendRequest, fetchVolatilityData]);

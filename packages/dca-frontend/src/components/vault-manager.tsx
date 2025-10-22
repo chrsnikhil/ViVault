@@ -32,6 +32,7 @@ import { ethers } from 'ethers';
 import { PriceCalculator, type TokenValue } from '@/lib/price-calculator';
 import { WithdrawPopup } from '@/components/withdraw-popup';
 import { SwapPopup } from '@/components/swap-popup';
+import { DepositPopup } from '@/components/deposit-popup';
 import { VolatilityIndexCard } from '@/components/volatility-index-card';
 import {
   Dialog,
@@ -57,6 +58,7 @@ export const VaultManager: React.FC = () => {
     decimals: number;
   } | null>(null);
   const [swapPopupOpen, setSwapPopupOpen] = useState(false);
+  const [depositPopupOpen, setDepositPopupOpen] = useState(false);
   const [showAllTokens, setShowAllTokens] = useState(false);
   const [tokenListPopupOpen, setTokenListPopupOpen] = useState(false);
   const [tokenSearchQuery, setTokenSearchQuery] = useState('');
@@ -665,9 +667,7 @@ export const VaultManager: React.FC = () => {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() => {
-                          // Add deposit functionality
-                        }}
+                        onClick={() => setDepositPopupOpen(true)}
                       >
                         <Plus className="size-4 mr-2" />
                         Deposit Tokens
@@ -1056,6 +1056,13 @@ export const VaultManager: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Deposit Popup */}
+      <DepositPopup
+        isOpen={depositPopupOpen}
+        onClose={() => setDepositPopupOpen(false)}
+        vaultAddress={vaultAddress || undefined}
+      />
     </div>
   );
 };

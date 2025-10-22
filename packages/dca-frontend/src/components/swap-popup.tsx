@@ -237,7 +237,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
       console.error('Error loading balances:', err);
     }
   }, [
-    authInfo?.pkp.ethAddress,
+    authInfo,
     tokenIn,
     tokenOut,
     vaultBalances,
