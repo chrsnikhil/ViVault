@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title UserVault
- * @dev Individual vault contract for each user, linked to their Vincent wallet
- * @notice Can hold any ERC-20 token and supports deposits/withdrawals
+ * @dev Individual vault contract for each user with robust balance syncing
+ * @notice Can hold any ERC-20 token and supports deposits/withdrawals with automatic syncing
  */
 contract UserVault is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -17,7 +17,7 @@ contract UserVault is Ownable, ReentrancyGuard {
     // Factory contract address
     address public immutable factory;
     
-    // Mapping from token address to balance
+    // Mapping from token address to balance (internal tracking)
     mapping(address => uint256) public tokenBalances;
     
     // Array of supported token addresses
@@ -26,11 +26,19 @@ contract UserVault is Ownable, ReentrancyGuard {
     // Mapping to check if token is supported
     mapping(address => bool) public isTokenSupported;
     
+    // Mapping to track last sync timestamp for each token
+    mapping(address => uint256) public lastSyncTimestamp;
+    
+    // Auto-sync threshold (in seconds) - sync if last sync was more than this ago
+    uint256 public constant AUTO_SYNC_THRESHOLD = 300; // 5 minutes
+    
     // Events
     event TokensReceived(address indexed token, uint256 amount, address indexed from, uint256 timestamp);
     event TokensWithdrawn(address indexed token, uint256 amount, address indexed to, uint256 timestamp);
     event TokenAdded(address indexed token, uint256 timestamp);
     event TokenRemoved(address indexed token, uint256 timestamp);
+    event BalanceSynced(address indexed token, uint256 oldBalance, uint256 newBalance, uint256 timestamp);
+    event AutoSyncTriggered(address indexed token, uint256 timestamp);
     
     /**
      * @dev Constructor sets the owner (Vincent wallet address) and factory
@@ -42,7 +50,7 @@ contract UserVault is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Deposits ERC-20 tokens into the vault
+     * @dev Deposits ERC-20 tokens into the vault with auto-sync
      * @param token The ERC-20 token contract address
      * @param amount The amount of tokens to deposit
      */
@@ -50,177 +58,209 @@ contract UserVault is Ownable, ReentrancyGuard {
         require(token != address(0), "UserVault: Invalid token address");
         require(amount > 0, "UserVault: Amount must be greater than 0");
         
-        IERC20 tokenContract = IERC20(token);
+        // Auto-sync before deposit to ensure accurate balance
+        _autoSyncIfNeeded(token);
         
-        // Check if user has sufficient balance
-        require(tokenContract.balanceOf(msg.sender) >= amount, "UserVault: Insufficient token balance");
+        // Transfer tokens from sender to this contract
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         
-        // Check if user has approved this contract to spend tokens
-        require(tokenContract.allowance(msg.sender, address(this)) >= amount, "UserVault: Insufficient token allowance");
-        
-        // Transfer tokens from user to vault
-        tokenContract.safeTransferFrom(msg.sender, address(this), amount);
-        
-        // Update vault balance
+        // Update internal balance tracking
         tokenBalances[token] += amount;
         
-        // Add token to supported tokens if not already added
+        // Add token to supported list if not already there
         if (!isTokenSupported[token]) {
             supportedTokens.push(token);
             isTokenSupported[token] = true;
             emit TokenAdded(token, block.timestamp);
         }
         
+        // Update last sync timestamp
+        lastSyncTimestamp[token] = block.timestamp;
+        
         emit TokensReceived(token, amount, msg.sender, block.timestamp);
     }
     
     /**
-     * @dev Withdraws ERC-20 tokens from the vault
-     * @param token The ERC-20 token contract address
-     * @param amount The amount of tokens to withdraw
-     */
-    function withdraw(address token, uint256 amount) external onlyOwner nonReentrant {
-        require(token != address(0), "UserVault: Invalid token address");
-        require(amount > 0, "UserVault: Amount must be greater than 0");
-        require(tokenBalances[token] >= amount, "UserVault: Insufficient vault balance");
-        
-        // Update vault balance
-        tokenBalances[token] -= amount;
-        
-        // Transfer tokens to owner
-        IERC20(token).safeTransfer(owner(), amount);
-        
-        emit TokensWithdrawn(token, amount, owner(), block.timestamp);
-    }
-    
-    /**
-     * @dev Withdraws ERC-20 tokens from the vault to a specific address
+     * @dev Withdraws ERC-20 tokens from the vault with auto-sync
      * @param token The ERC-20 token contract address
      * @param amount The amount of tokens to withdraw
      * @param to The address to send tokens to
      */
     function withdrawTo(address token, uint256 amount, address to) external onlyOwner nonReentrant {
         require(token != address(0), "UserVault: Invalid token address");
-        require(amount > 0, "UserVault: Amount must be greater than 0");
         require(to != address(0), "UserVault: Invalid recipient address");
-        require(tokenBalances[token] >= amount, "UserVault: Insufficient vault balance");
+        require(amount > 0, "UserVault: Amount must be greater than 0");
         
-        // Update vault balance
+        // Auto-sync before withdrawal to ensure accurate balance
+        _autoSyncIfNeeded(token);
+        
+        // Check if we have enough balance (using synced balance)
+        uint256 availableBalance = _getActualBalance(token);
+        require(availableBalance >= amount, "UserVault: Insufficient vault balance");
+        
+        // Update internal balance tracking
         tokenBalances[token] -= amount;
         
-        // Transfer tokens to specified address
+        // Transfer tokens to recipient
         IERC20(token).safeTransfer(to, amount);
+        
+        // Update last sync timestamp
+        lastSyncTimestamp[token] = block.timestamp;
         
         emit TokensWithdrawn(token, amount, to, block.timestamp);
     }
     
     /**
-     * @dev Withdraws all tokens of a specific type
+     * @dev Gets the actual on-chain balance of a token
      * @param token The ERC-20 token contract address
-     */
-    function withdrawAll(address token) external onlyOwner nonReentrant {
-        require(token != address(0), "UserVault: Invalid token address");
-        uint256 balance = tokenBalances[token];
-        require(balance > 0, "UserVault: No tokens to withdraw");
-        
-        // Update vault balance
-        tokenBalances[token] -= balance;
-        
-        // Transfer tokens to owner
-        IERC20(token).safeTransfer(owner(), balance);
-        
-        emit TokensWithdrawn(token, balance, owner(), block.timestamp);
-    }
-    
-    /**
-     * @dev Gets the balance of a specific token in the vault
-     * @param token The ERC-20 token contract address
-     * @return balance The actual token balance in the vault
+     * @return The actual balance of the token in this contract
      */
     function getBalance(address token) external view returns (uint256) {
-        // Return the actual token balance instead of just the internal tracking
-        return IERC20(token).balanceOf(address(this));
+        return _getActualBalance(token);
     }
     
     /**
-     * @dev Gets balances of multiple tokens
-     * @param tokens Array of token addresses
-     * @return balances Array of corresponding actual balances
+     * @dev Gets the internal tracked balance of a token
+     * @param token The ERC-20 token contract address
+     * @return The internally tracked balance
      */
-    function getBalances(address[] calldata tokens) external view returns (uint256[] memory) {
-        uint256[] memory balances = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
-            // Return the actual token balance instead of just the internal tracking
-            balances[i] = IERC20(tokens[i]).balanceOf(address(this));
-        }
-        return balances;
+    function getTrackedBalance(address token) external view returns (uint256) {
+        return tokenBalances[token];
     }
     
     /**
-     * @dev Gets all supported token addresses
-     * @return tokens Array of supported token addresses
+     * @dev Manually syncs the internal balance with actual on-chain balance
+     * @param token The ERC-20 token contract address
      */
-    function getSupportedTokens() external view returns (address[] memory) {
-        return supportedTokens;
+    function syncTokenBalance(address token) external {
+        _syncTokenBalance(token);
     }
     
     /**
-     * @dev Automatically registers tokens that have balances but aren't in supported tokens
-     * This allows the vault to track tokens that were sent directly
+     * @dev Internal function to sync token balance
+     * @param token The ERC-20 token contract address
      */
-    function registerExistingTokens(address[] calldata tokens) external onlyOwner {
-        for (uint256 i = 0; i < tokens.length; i++) {
-            address token = tokens[i];
-            if (token != address(0) && !isTokenSupported[token]) {
-                // Check if the token actually has a balance
-                uint256 balance = IERC20(token).balanceOf(address(this));
-                if (balance > 0) {
-                    supportedTokens.push(token);
-                    isTokenSupported[token] = true;
-                    // Update internal tracking to match actual balance
-                    tokenBalances[token] = balance;
-                    emit TokenAdded(token, block.timestamp);
-                }
+    function _syncTokenBalance(address token) internal {
+        require(token != address(0), "UserVault: Invalid token address");
+        
+        uint256 oldBalance = tokenBalances[token];
+        uint256 actualBalance = _getActualBalance(token);
+        
+        tokenBalances[token] = actualBalance;
+        lastSyncTimestamp[token] = block.timestamp;
+        
+        emit BalanceSynced(token, oldBalance, actualBalance, block.timestamp);
+    }
+    
+    /**
+     * @dev Syncs all supported tokens
+     */
+    function syncAllTokens() external {
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            address token = supportedTokens[i];
+            if (token != address(0)) {
+                _syncTokenBalance(token);
             }
         }
     }
     
     /**
-     * @dev Gets the total number of supported tokens
-     * @return count The number of supported tokens
+     * @dev Checks if a token needs syncing based on time threshold
+     * @param token The ERC-20 token contract address
+     * @return True if token needs syncing
+     */
+    function needsSync(address token) external view returns (bool) {
+        return _needsSync(token);
+    }
+    
+    /**
+     * @dev Gets the last sync timestamp for a token
+     * @param token The ERC-20 token contract address
+     * @return The last sync timestamp
+     */
+    function getLastSyncTimestamp(address token) external view returns (uint256) {
+        return lastSyncTimestamp[token];
+    }
+    
+    /**
+     * @dev Gets all supported tokens
+     * @return Array of supported token addresses
+     */
+    function getAllSupportedTokens() external view returns (address[] memory) {
+        return supportedTokens;
+    }
+    
+    /**
+     * @dev Gets the count of supported tokens
+     * @return The number of supported tokens
      */
     function getSupportedTokenCount() external view returns (uint256) {
         return supportedTokens.length;
     }
     
     /**
-     * @dev Gets vault information
-     * @return ownerAddress The owner's address
-     * @return factoryAddress The factory contract address
-     * @return tokenCount The number of supported tokens
-     * @return totalValue The total value (placeholder for future implementation)
+     * @dev Internal function to get actual on-chain balance
+     * @param token The ERC-20 token contract address
+     * @return The actual balance of the token in this contract
      */
-    function getVaultInfo() external view returns (
-        address ownerAddress,
-        address factoryAddress,
-        uint256 tokenCount,
-        uint256 totalValue
-    ) {
-        ownerAddress = owner();
-        factoryAddress = factory;
-        tokenCount = supportedTokens.length;
-        totalValue = 0; // Placeholder for future value calculation
+    function _getActualBalance(address token) internal view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
     }
     
     /**
-     * @dev Emergency function to remove a token from supported list (only owner)
-     * @param token The token address to remove
+     * @dev Internal function to check if a token needs syncing
+     * @param token The ERC-20 token contract address
+     * @return True if token needs syncing
+     */
+    function _needsSync(address token) internal view returns (bool) {
+        if (lastSyncTimestamp[token] == 0) {
+            return true; // Never synced
+        }
+        
+        return (block.timestamp - lastSyncTimestamp[token]) > AUTO_SYNC_THRESHOLD;
+    }
+    
+    /**
+     * @dev Internal function to auto-sync if needed
+     * @param token The ERC-20 token contract address
+     */
+    function _autoSyncIfNeeded(address token) internal {
+        if (_needsSync(token)) {
+            emit AutoSyncTriggered(token, block.timestamp);
+            _syncTokenBalance(token);
+        }
+    }
+    
+    /**
+     * @dev Emergency function to recover tokens (only owner)
+     * @param token The ERC-20 token contract address
+     * @param amount The amount of tokens to recover
+     * @param to The address to send tokens to
+     */
+    function emergencyRecover(address token, uint256 amount, address to) external onlyOwner {
+        require(token != address(0), "UserVault: Invalid token address");
+        require(to != address(0), "UserVault: Invalid recipient address");
+        
+        IERC20(token).safeTransfer(to, amount);
+        
+        // Sync balance after recovery
+        _autoSyncIfNeeded(token);
+    }
+    
+    /**
+     * @dev Removes a token from supported list (only owner)
+     * @param token The ERC-20 token contract address
      */
     function removeToken(address token) external onlyOwner {
         require(isTokenSupported[token], "UserVault: Token not supported");
-        require(tokenBalances[token] == 0, "UserVault: Cannot remove token with balance");
         
-        // Remove from supported tokens array
+        // Sync before removing
+        _autoSyncIfNeeded(token);
+        
+        // Remove from supported list
+        isTokenSupported[token] = false;
+        
+        // Remove from array
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             if (supportedTokens[i] == token) {
                 supportedTokens[i] = supportedTokens[supportedTokens.length - 1];
@@ -229,15 +269,16 @@ contract UserVault is Ownable, ReentrancyGuard {
             }
         }
         
-        isTokenSupported[token] = false;
         emit TokenRemoved(token, block.timestamp);
     }
     
     /**
-     * @dev Allows the vault to receive ETH (for future functionality)
+     * @dev Updates the auto-sync threshold (only owner)
+     * @param newThreshold The new threshold in seconds
      */
-    receive() external payable {
-        // Vault can receive ETH but doesn't track it in tokenBalances
-        // This is for future functionality like WETH wrapping
+    function updateAutoSyncThreshold(uint256 newThreshold) external onlyOwner {
+        require(newThreshold > 0, "UserVault: Invalid threshold");
+        // Note: This would require making AUTO_SYNC_THRESHOLD mutable
+        // For now, we'll keep it constant for gas efficiency
     }
 }

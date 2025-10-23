@@ -84,5 +84,9 @@ export function getTimerStatus() {
 export async function startWorker() {
   consola.warn('⚠️ startWorker() is deprecated, use startVolatilityTimer() instead');
   startVolatilityTimer();
+  
+  consola.info('🤖 Automated rebalancing triggers are integrated with volatility updates');
+  consola.info('🤖 Enable automation via /api/automation/config endpoint');
+  
   return null;
 }

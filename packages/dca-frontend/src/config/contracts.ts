@@ -2,7 +2,7 @@
 
 // Deployed VaultFactory address on Base Sepolia
 export const CONTRACT_ADDRESSES = {
-  VaultFactory: '0xF68D5b37407809Ed208e73e9Ced8a0fbbb3CdABE', // Updated VaultFactory with withdrawTo function
+  VaultFactory: '0x56ab9F1E53D3696766EE2eb13af8D4540924b4B0', // Updated VaultFactory with syncing mechanisms
 };
 
 // Common ERC20 token addresses on Base Sepolia
@@ -79,15 +79,23 @@ export const USER_VAULT_ABI = [
   'function withdrawTo(address token, uint256 amount, address to) external',
   'function withdrawAll(address token) external',
   'function getBalance(address token) external view returns (uint256)',
+  'function getTrackedBalance(address token) external view returns (uint256)',
   'function getBalances(address[] calldata tokens) external view returns (uint256[] memory)',
-  'function getSupportedTokens() external view returns (address[] memory)',
+  'function getAllSupportedTokens() external view returns (address[] memory)',
   'function getSupportedTokenCount() external view returns (uint256)',
   'function getVaultInfo() external view returns (address ownerAddress, address factoryAddress, uint256 tokenCount, uint256 totalValue)',
-  'function registerExistingTokens(address[] calldata tokens) external',
+  'function syncTokenBalance(address token) external',
+  'function syncAllTokens() external',
+  'function needsSync(address token) external view returns (bool)',
+  'function getLastSyncTimestamp(address token) external view returns (uint256)',
+  'function removeToken(address token) external',
+  'function emergencyRecover(address token, uint256 amount, address to) external',
   'event TokensReceived(address indexed token, uint256 amount, address indexed from, uint256 timestamp)',
   'event TokensWithdrawn(address indexed token, uint256 amount, address indexed to, uint256 timestamp)',
   'event TokenAdded(address indexed token, uint256 timestamp)',
   'event TokenRemoved(address indexed token, uint256 timestamp)',
+  'event BalanceSynced(address indexed token, uint256 oldBalance, uint256 newBalance, uint256 timestamp)',
+  'event AutoSyncTriggered(address indexed token, uint256 timestamp)',
 ];
 
 // Minimal ABI for ERC20 tokens

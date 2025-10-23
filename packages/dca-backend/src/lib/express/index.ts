@@ -8,6 +8,13 @@ import { getAppInfo, getPKPInfo, isAppUser } from '@lit-protocol/vincent-app-sdk
 
 // DCA-specific routes removed - keeping only Vincent authentication
 import { userKey, VincentAuthenticatedRequest } from './types';
+import {
+  getAutomationStatusApi,
+  updateAutomationConfigApi,
+  forceRebalancingApi,
+  resetDailyCounterApi,
+  getAutomationHistoryApi
+} from '../automationController';
 import { env } from '../env';
 import { getTimerStatus } from '../jobWorker';
 import { serviceLogger } from '../logger';
@@ -134,6 +141,23 @@ export const registerRoutes = (app: Express) => {
       });
     }
   });
+
+  // ===== AUTOMATED REBALANCING ROUTES =====
+  
+  // Get automation status
+  app.get('/api/automation/status', getAutomationStatusApi);
+  
+  // Update automation configuration
+  app.post('/api/automation/config', updateAutomationConfigApi);
+  
+  // Force execute rebalancing
+  app.post('/api/automation/force-rebalancing', forceRebalancingApi);
+  
+  // Reset daily counter
+  app.post('/api/automation/reset-daily-counter', resetDailyCounterApi);
+  
+  // Get automation history
+  app.get('/api/automation/history', getAutomationHistoryApi);
 
   serviceLogger.info(`Routes registered`);
 };

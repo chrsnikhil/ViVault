@@ -2,6 +2,7 @@ import consola from 'consola';
 import { ethers } from 'ethers';
 
 import { env } from './env';
+import { checkAndTriggerRebalancing } from './simpleAutomation';
 
 // Pyth price feed IDs for Base Sepolia
 const PRICE_FEED_IDS = {
@@ -450,6 +451,26 @@ export async function updateVolatilityIndex(): Promise<void> {
     });
 
     consola.success('🎉 Volatility index update completed successfully!');
+
+    // After successful volatility update, check if we should trigger rebalancing
+    consola.info('🤖 Checking automation triggers after volatility update...');
+    
+    // Get the volatility values from the contract
+    const wethVolatilityData = await getVolatilityData(PRICE_FEED_IDS.WETH_USD);
+    const usdcVolatilityData = await getVolatilityData(PRICE_FEED_IDS.USDC_USD);
+    
+    if (wethVolatilityData && usdcVolatilityData) {
+      const wethVolatilityPercent = wethVolatilityData.volatilityBps / 100;
+      const usdcVolatilityPercent = usdcVolatilityData.volatilityBps / 100;
+      
+      consola.info(`📊 Current volatility - WETH: ${wethVolatilityPercent}%, USDC: ${usdcVolatilityPercent}%`);
+      
+      // Check and trigger rebalancing if thresholds are exceeded
+      // Note: vaultInfo would need to be provided by the user/frontend
+      await checkAndTriggerRebalancing(wethVolatilityPercent, usdcVolatilityPercent);
+    } else {
+      consola.warn('⚠️ Could not fetch volatility data for automation check');
+    }
   } catch (error) {
     consola.error('💥 Volatility index update failed:', error);
     throw error;

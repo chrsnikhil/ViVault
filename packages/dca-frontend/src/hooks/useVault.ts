@@ -9,7 +9,6 @@ import {
   VAULT_FACTORY_ABI,
   USER_VAULT_ABI,
   ERC20_ABI,
-  COMMON_TOKENS,
 } from '@/config/contracts';
 
 // Types
@@ -332,22 +331,29 @@ export const useVault = () => {
         let tokensToCheck = [];
 
         try {
-          // First, get the supported tokens from the vault
-          const supportedTokens = await vault.getSupportedTokens();
+          // Only check the two specific tokens: WETH and USDC
+          const specificTokens = [
+            '0x4200000000000000000000000000000000000006', // WETH
+            '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+          ];
+          tokensToCheck = specificTokens;
 
-          // If vault has supported tokens, use those; otherwise check common tokens
-          if (supportedTokens.length > 0) {
-            tokensToCheck = supportedTokens;
-          } else {
-            // For new vaults, check common tokens
-            tokensToCheck = Object.values(COMMON_TOKENS);
-          }
-
-          // NEW: The updated contract's getBalances() now returns actual token balances
-          balancesRaw = await vault.getBalances(tokensToCheck);
+          // Get balances for each token individually using getBalance()
+          balancesRaw = await Promise.all(
+            tokensToCheck.map(async (tokenAddress: string) => {
+              try {
+                return await vault.getBalance(tokenAddress);
+              } catch {
+                return ethers.BigNumber.from(0);
+              }
+            })
+          );
         } catch {
           balancesRaw = [];
-          tokensToCheck = Object.values(COMMON_TOKENS); // Fallback to common tokens
+          tokensToCheck = [
+            '0x4200000000000000000000000000000000000006', // WETH
+            '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+          ];
         }
 
         const balances: TokenBalance[] = await Promise.all(
@@ -373,11 +379,17 @@ export const useVault = () => {
           })
         );
 
+        // Filter out tokens with zero balance to avoid cluttering the UI
+        const nonZeroBalances = balances.filter(balance => {
+          const balanceWei = ethers.BigNumber.from(balance.balance);
+          return balanceWei.gt(0);
+        });
+
         const result = {
           address: vaultAddress,
           owner: ownerFromContract,
           factory: factoryFromContract,
-          balances,
+          balances: nonZeroBalances,
           supportedTokens,
           tokenCount: tokenCount.toNumber(),
         };

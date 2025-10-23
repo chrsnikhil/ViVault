@@ -55,6 +55,7 @@ interface SwapPopupProps {
     balance: string;
     decimals: number;
   }>;
+  onSwapComplete?: () => void;
 }
 
 export const SwapPopup: React.FC<SwapPopupProps> = ({
@@ -62,6 +63,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
   onClose,
   vaultAddress,
   vaultBalances,
+  onSwapComplete,
 }) => {
   const { authInfo } = useJwtContext();
 
@@ -99,15 +101,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     () => new VincentUniswapSwapService('https://base-sepolia.public.blastapi.io')
   );
 
-  // Normalize symbols to improve matching (e.g., "Wrapped Ether" -> "weth", "USDC-Circle" -> "usdc")
-  const normalizeSymbol = useCallback((s?: string) => {
-    if (!s) return '';
-    const lower = s.toLowerCase();
-    if (lower.includes('wrapped') && (lower.includes('eth') || lower.includes('ether')))
-      return 'weth';
-    if (lower.includes('usdc')) return 'usdc';
-    return lower.replace(/[^a-z0-9]/g, '');
-  }, []);
 
   // Available tokens for swapping on Base Sepolia
   const availableTokens = useMemo(
@@ -143,42 +136,41 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
         if (tokenInData) {
           let balance = '0';
 
-          // Get balance from vault
-          if (vaultBalances && vaultAddress) {
-            console.log('🔍 SwapPopup: Searching for tokenIn in vault balances...');
-            console.log('🔍 SwapPopup: Looking for address:', tokenIn);
-            console.log(
-              '🔍 SwapPopup: Available vault balances:',
-              vaultBalances.map((b) => ({
-                address: b.address,
-                symbol: b.symbol,
-                balance: b.balance,
-              }))
-            );
+          // Get balance from vault - fetch fresh data instead of using stale props
+          if (vaultAddress) {
+            try {
+              // Fetch fresh vault data instead of using stale vaultBalances prop
+              console.log('🔍 SwapPopup: Fetching fresh vault data for address:', vaultAddress);
+              const { getVaultInfo } = await import('@/hooks/useVault');
+              const freshVaultInfo = await getVaultInfo(vaultAddress);
+              console.log('🔍 SwapPopup: Fresh vault info:', freshVaultInfo);
 
-            // Prefer exact address match; fallback to same-symbol match
-            let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
-            if (!vb) {
-              const targetSym = normalizeSymbol(tokenInData.symbol);
-              console.log(
-                '🔍 SwapPopup: No exact address match, trying symbol match for:',
-                targetSym
-              );
-              vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
-            }
-            if (vb) {
-              balance = vb.balance;
-              console.log(
-                '🔍 SwapPopup: Using vault balance for',
-                tokenInData.symbol,
-                ':',
-                balance
-              );
-            } else {
-              console.log('🔍 SwapPopup: Token not found in vault:', tokenInData.symbol);
+              // Find the token in fresh vault data
+              const vb = freshVaultInfo.balances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
+              if (vb) {
+                balance = ethers.utils.formatUnits(vb.balance, vb.decimals);
+                console.log(
+                  '🔍 SwapPopup: Using fresh vault balance for',
+                  tokenInData.symbol,
+                  ':',
+                  balance
+                );
+              } else {
+                console.log('🔍 SwapPopup: Token not found in fresh vault data:', tokenInData.symbol);
+              }
+            } catch (error) {
+              console.error('🔍 SwapPopup: Error fetching fresh vault data:', error);
+              // Fallback to stale prop data
+              if (vaultBalances) {
+                const vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
+                if (vb) {
+                  balance = vb.balance;
+                  console.log('🔍 SwapPopup: Using stale vault balance as fallback:', balance);
+                }
+              }
             }
           } else {
-            console.log('🔍 SwapPopup: No vault balances or vault address available');
+            console.log('🔍 SwapPopup: No vault address available');
           }
 
           setTokenInInfo({
@@ -195,34 +187,40 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
         if (tokenOutData) {
           let balance = '0';
 
-          // Get balance from vault
-          if (vaultBalances && vaultAddress) {
-            console.log('🔍 SwapPopup: Searching for tokenOut in vault balances...');
-            console.log('🔍 SwapPopup: Looking for address:', tokenOut);
+          // Get balance from vault - fetch fresh data instead of using stale props
+          if (vaultAddress) {
+            try {
+              // Fetch fresh vault data instead of using stale vaultBalances prop
+              console.log('🔍 SwapPopup: Fetching fresh vault data for tokenOut:', tokenOut);
+              const { getVaultInfo } = await import('@/hooks/useVault');
+              const freshVaultInfo = await getVaultInfo(vaultAddress);
 
-            // Prefer exact address match; fallback to same-symbol match
-            let vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
-            if (!vb) {
-              const targetSym = normalizeSymbol(tokenOutData.symbol);
-              console.log(
-                '🔍 SwapPopup: No exact address match, trying symbol match for:',
-                targetSym
-              );
-              vb = vaultBalances.find((b) => normalizeSymbol(b.symbol) === targetSym);
-            }
-            if (vb) {
-              balance = vb.balance;
-              console.log(
-                '🔍 SwapPopup: Using vault balance for',
-                tokenOutData.symbol,
-                ':',
-                balance
-              );
-            } else {
-              console.log('🔍 SwapPopup: Token not found in vault:', tokenOutData.symbol);
+              // Find the token in fresh vault data
+              const vb = freshVaultInfo.balances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
+              if (vb) {
+                balance = ethers.utils.formatUnits(vb.balance, vb.decimals);
+                console.log(
+                  '🔍 SwapPopup: Using fresh vault balance for',
+                  tokenOutData.symbol,
+                  ':',
+                  balance
+                );
+              } else {
+                console.log('🔍 SwapPopup: Token not found in fresh vault data:', tokenOutData.symbol);
+              }
+            } catch (error) {
+              console.error('🔍 SwapPopup: Error fetching fresh vault data for tokenOut:', error);
+              // Fallback to stale prop data
+              if (vaultBalances) {
+                const vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
+                if (vb) {
+                  balance = vb.balance;
+                  console.log('🔍 SwapPopup: Using stale vault balance as fallback for tokenOut:', balance);
+                }
+              }
             }
           } else {
-            console.log('🔍 SwapPopup: No vault balances or vault address available for tokenOut');
+            console.log('🔍 SwapPopup: No vault address available for tokenOut');
           }
 
           setTokenOutInfo({
@@ -242,7 +240,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     tokenOut,
     vaultBalances,
     vaultAddress,
-    normalizeSymbol,
     availableTokens,
     swapService,
   ]);
@@ -364,8 +361,22 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
       const vaultContract = vincentSigner.createContract(vaultAddress, USER_VAULT_ABI);
 
-      // Check vault balance before attempting withdrawal
-      console.log('🔍 Checking vault balance before withdrawal...');
+      // Step 1: Sync vault balance before checking
+      console.log('🔄 Syncing vault balance before withdrawal...');
+      try {
+        const syncTx = await vincentSigner.sendContractTransaction(
+          vaultContract,
+          'syncTokenBalance',
+          tokenIn
+        );
+        await syncTx.wait();
+        console.log('✅ Vault balance synced:', syncTx.hash);
+      } catch (error) {
+        console.warn('⚠️ Failed to sync vault balance, proceeding with current balance:', error);
+      }
+
+      // Step 2: Check vault balance after sync
+      console.log('🔍 Checking vault balance after sync...');
       const vaultBalance = await vaultContract.getBalance(tokenIn);
       console.log('🔍 Vault balance (wei):', vaultBalance.toString());
       console.log('🔍 Required amount (wei):', amountInWei);
@@ -376,28 +387,24 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
         );
       }
 
-      // Check if token is registered in vault
-      console.log('🔍 Checking if token is registered in vault...');
-      const supportedTokens = await vaultContract.getSupportedTokens();
-      const isTokenSupported = supportedTokens.includes(tokenIn);
-      console.log('🔍 Token supported in vault:', isTokenSupported);
-      console.log('🔍 Supported tokens:', supportedTokens);
-
-      if (!isTokenSupported) {
-        console.log('🔍 Token not registered, attempting to register...');
+      // Check if WETH is supported in vault, if not, deposit a tiny amount to register it
+      const supportedTokens = await vaultContract.getAllSupportedTokens();
+      const isWETHSupported = supportedTokens.includes(tokenIn);
+      
+      if (!isWETHSupported && tokenIn === '0x4200000000000000000000000000000000000006') {
+        console.log('🔍 WETH not supported in vault, depositing tiny amount to register it...');
         try {
-          const registerTx = await vincentSigner.sendContractTransaction(
+          // Deposit 1 wei of WETH to register it in the vault
+          const tinyAmount = ethers.BigNumber.from(1); // 1 wei
+          const depositTx = await vincentSigner.sendContractTransaction(
             vaultContract,
-            'registerExistingTokens',
-            [tokenIn]
+            'deposit',
+            [tokenIn, tinyAmount]
           );
-          await registerTx.wait();
-          console.log('✅ Token registered in vault');
-        } catch (registerError) {
-          console.error('❌ Failed to register token:', registerError);
-          throw new Error(
-            `Token ${tokenInData.symbol} is not registered in vault and registration failed`
-          );
+          await depositTx.wait();
+          console.log('✅ WETH registered in vault:', depositTx.hash);
+        } catch (depositError) {
+          console.warn('⚠️ Failed to register WETH, proceeding with swap:', depositError.message);
         }
       }
 
@@ -499,39 +506,36 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             'tokens back to vault...'
           );
 
-          // Transfer all output tokens back to vault
-          const transferTx = await vincentSigner.sendContractTransaction(
+          // Approve vault to spend the output tokens
+          console.log('🔍 Approving vault to spend output tokens...');
+          const approveVaultTx = await vincentSigner.sendContractTransaction(
             tokenOutContract,
-            'transfer',
+            'approve',
             vaultAddress,
             pkpBalance
           );
+          await approveVaultTx.wait();
+          console.log('✅ Vault approved to spend output tokens');
 
-          console.log('🔍 Transfer back to vault transaction sent:', transferTx.hash);
-          await transferTx.wait();
-          console.log('✅ Tokens transferred back to vault');
+          // Deposit tokens into vault using the vault's deposit function
+          console.log('🔍 Depositing tokens into vault...');
+          const depositTx = await vincentSigner.sendContractTransaction(
+            vaultContract,
+            'deposit',
+            tokenOut,
+            pkpBalance
+          );
 
-          // Register the output token in the vault so it shows up in balances
-          console.log('🔍 Registering output token in vault...');
-          try {
-            const registerTx = await vincentSigner.sendContractTransaction(
-              vaultContract,
-              'registerExistingTokens',
-              [tokenOut]
-            );
-            await registerTx.wait();
-            console.log('✅ Output token registered in vault');
-          } catch (registerError) {
-            console.warn('⚠️ Failed to register output token in vault:', registerError);
-            // Don't fail the entire swap if registration fails
-          }
+          console.log('🔍 Deposit to vault transaction sent:', depositTx.hash);
+          await depositTx.wait();
+          console.log('✅ Tokens deposited into vault');
 
           setSuccess('Swap completed successfully!');
           setSuccessDetails({
             withdraw: withdrawTx.hash,
             approve: approveTx?.hash || null,
             swap: result.swapTxHash,
-            transfer: transferTx.hash,
+            transfer: depositTx.hash,
           });
         } else {
           console.log('⚠️ No output tokens found in PKP wallet to transfer back to vault');
@@ -560,6 +564,11 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
 
       // Reload balances
       await loadBalances();
+
+      // Notify parent component that swap completed
+      if (onSwapComplete) {
+        onSwapComplete();
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Swap failed';
       setError(errorMessage);
@@ -703,7 +712,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenInInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {ethers.utils.formatUnits(tokenInInfo.balance, tokenInInfo.decimals)}{' '}
+                Balance: {tokenInInfo.balance}{' '}
                 {tokenInInfo.symbol}
               </div>
             )}
@@ -759,7 +768,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenOutInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {ethers.utils.formatUnits(tokenOutInfo.balance, tokenOutInfo.decimals)}{' '}
+                Balance: {tokenOutInfo.balance}{' '}
                 {tokenOutInfo.symbol}
               </div>
             )}

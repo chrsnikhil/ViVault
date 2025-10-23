@@ -34,6 +34,8 @@ import { WithdrawPopup } from '@/components/withdraw-popup';
 import { SwapPopup } from '@/components/swap-popup';
 import { DepositPopup } from '@/components/deposit-popup';
 import { VolatilityIndexCard } from '@/components/volatility-index-card';
+import { RebalancingPanel } from '@/components/rebalancing-panel';
+import { AutomationPanel } from '@/components/automation-panel';
 import {
   Dialog,
   DialogContent,
@@ -85,6 +87,48 @@ export const VaultManager: React.FC = () => {
     withdraw,
     registerExistingTokens,
   } = useVault();
+
+  // Load vault address when component mounts or when authInfo changes
+  useEffect(() => {
+    const loadVaultAddress = async () => {
+      if (authInfo?.pkp.ethAddress) {
+        try {
+          const address = await getVaultAddress();
+          setVaultAddress(address);
+          console.log('🔍 Vault address loaded:', address);
+        } catch (error) {
+          console.error('❌ Error loading vault address:', error);
+          setVaultAddress(null);
+        }
+      } else {
+        setVaultAddress(null);
+      }
+    };
+
+    loadVaultAddress();
+  }, [authInfo?.pkp.ethAddress, getVaultAddress]);
+
+  // Load vault info when vault address changes
+  const loadVaultInfo = useCallback(async () => {
+    if (vaultAddress) {
+      try {
+        console.log('🔍 Loading vault info for address:', vaultAddress);
+        const info = await getVaultInfo(vaultAddress);
+        setVaultInfo(info);
+        console.log('✅ Vault info loaded:', info);
+      } catch (error) {
+        console.error('❌ Error loading vault info:', error);
+        setVaultInfo(null);
+      }
+    } else {
+      setVaultInfo(null);
+    }
+  }, [vaultAddress, getVaultInfo]);
+
+  useEffect(() => {
+    loadVaultInfo();
+  }, [loadVaultInfo]);
+
   // Lightweight Hermes price fetcher (REST via CORS-friendly proxies)
   const fetchLatestPrices = useCallback(async (): Promise<
     Array<{ id: string; symbol: string; price: number; confidence: number; publishTime: number }>
@@ -689,6 +733,39 @@ export const VaultManager: React.FC = () => {
               {/* Volatility Index */}
               <VolatilityIndexCard />
 
+              {/* Rebalancing Panel */}
+              {vaultInfo && vaultInfo.balances && vaultInfo.balances.length > 0 && (
+                <RebalancingPanel
+                  vaultAddress={vaultAddress || ''}
+                  vaultBalances={vaultInfo.balances.map(balance => ({
+                    address: balance.address,
+                    symbol: balance.symbol,
+                    balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
+                    decimals: balance.decimals
+                  }))}
+                  pkpAddress={authInfo?.pkp.ethAddress || ''}
+                  onRebalanceComplete={(result) => {
+                    console.log('Rebalancing completed:', result);
+                    // Refresh vault data after rebalancing
+                    loadVaultInfo();
+                  }}
+                />
+              )}
+
+              {/* Automation Panel */}
+              {vaultInfo && vaultInfo.balances && vaultInfo.balances.length > 0 && (
+                <AutomationPanel
+                  vaultAddress={vaultAddress || ''}
+                  vaultBalances={vaultInfo.balances.map(balance => ({
+                    address: balance.address,
+                    symbol: balance.symbol,
+                    balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
+                    decimals: balance.decimals
+                  }))}
+                  pkpAddress={authInfo?.pkp.ethAddress || ''}
+                />
+              )}
+
               {/* Token Balances Grid */}
               {vaultInfo?.balances && vaultInfo.balances.length > 0 && (
                 <div className="space-y-6">
@@ -1062,6 +1139,23 @@ export const VaultManager: React.FC = () => {
         isOpen={depositPopupOpen}
         onClose={() => setDepositPopupOpen(false)}
         vaultAddress={vaultAddress || undefined}
+      />
+
+      {/* Swap Popup */}
+      <SwapPopup
+        isOpen={swapPopupOpen}
+        onClose={() => setSwapPopupOpen(false)}
+        vaultAddress={vaultAddress || ''}
+        vaultBalances={vaultInfo?.balances?.map(balance => ({
+          address: balance.address,
+          symbol: balance.symbol,
+          balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
+          decimals: balance.decimals
+        })) || []}
+        onSwapComplete={() => {
+          console.log('Swap completed, refreshing vault data');
+          loadVaultInfo();
+        }}
       />
     </div>
   );

@@ -59,6 +59,64 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
   const [success, setSuccess] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'approve' | 'deposit' | 'complete'>('select');
 
+  // Load user wallet balances - tokens the user can deposit
+  const loadUserBalances = useCallback(async () => {
+    console.log('🔍 Loading user wallet balances...');
+    try {
+      // Check if user has a connected wallet
+      if (!window.ethereum) {
+        console.log('❌ No wallet connected');
+        setUserBalances([]);
+        return;
+      }
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const userAddress = await signer.getAddress();
+      
+      console.log('🔍 User address:', userAddress);
+
+      // Check balances for WETH and USDC
+      const tokensToCheck = [
+        { address: '0x4200000000000000000000000000000000000006', symbol: 'WETH', decimals: 18 },
+        { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', symbol: 'USDC', decimals: 6 }
+      ];
+
+      const balances: TokenBalance[] = [];
+
+      for (const token of tokensToCheck) {
+        try {
+          const tokenContract = new ethers.Contract(token.address, [
+            'function balanceOf(address owner) view returns (uint256)',
+            'function symbol() view returns (string)',
+            'function decimals() view returns (uint8)'
+          ], provider);
+
+          const balance = await tokenContract.balanceOf(userAddress);
+          
+          if (balance.gt(0)) {
+            balances.push({
+              address: token.address,
+              symbol: token.symbol,
+              balance: ethers.utils.formatUnits(balance, token.decimals),
+              decimals: token.decimals,
+              rawBalance: balance
+            });
+            console.log(`✅ ${token.symbol}: ${ethers.utils.formatUnits(balance, token.decimals)}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch ${token.symbol} balance:`, error);
+        }
+      }
+
+      setUserBalances(balances);
+      console.log(`🔍 Loaded ${balances.length} user token balances`);
+    } catch (error) {
+      console.error('❌ Failed to load user balances:', error);
+      setUserBalances([]);
+    }
+  }, []);
+
   // Load vault tokens - show vault tokens in dropdown, user deposits from external wallet
   const loadVaultBalances = useCallback(async () => {
     if (!vaultAddress) {
@@ -96,6 +154,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
   // Load balances when popup opens
   useEffect(() => {
     if (isOpen) {
+      loadUserBalances(); // Load user wallet balances first
       loadVaultBalances();
       setStep('select');
       setError(null);
@@ -103,7 +162,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
       setAmount('');
       setSelectedToken('');
     }
-  }, [isOpen, loadVaultBalances]);
+  }, [isOpen, loadUserBalances, loadVaultBalances]);
 
   // Get selected token info
   const selectedTokenInfo = selectedToken ? getTokenInfo(selectedToken) : null;
@@ -201,6 +260,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         [
           'function approve(address spender, uint256 amount) returns (bool)',
           'function allowance(address owner, address spender) view returns (uint256)',
+          'function balanceOf(address owner) view returns (uint256)',
           'function decimals() view returns (uint8)',
         ],
         signer
@@ -209,7 +269,10 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
       // Get vault contract
       const vaultContract = new ethers.Contract(
         vaultAddress,
-        ['function deposit(address token, uint256 amount) external'],
+        [
+          'function deposit(address token, uint256 amount) external',
+          'function getSupportedTokens() external view returns (address[] memory)',
+        ],
         signer
       );
 
@@ -228,17 +291,66 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         console.log('🔓 Approving token spending...');
         setStep('approve');
 
-        // Approve a much larger amount to avoid future approval issues
-        const approveAmount = ethers.utils.parseUnits('1000000', decimals); // Approve 1M tokens
-        console.log('📊 Approving amount:', ethers.utils.formatUnits(approveAmount, decimals));
+        // Check user's actual balance first
+        const userBalance = await tokenContract.balanceOf(userAddress);
+        console.log('📊 User balance:', ethers.utils.formatUnits(userBalance, decimals));
+        console.log('📊 Required amount:', ethers.utils.formatUnits(amountWei, decimals));
 
-        const approveTx = await tokenContract.approve(vaultAddress, approveAmount, {
-          gasLimit: 100000, // Set explicit gas limit
-        });
-        console.log('⏳ Waiting for approval confirmation...');
-        const receipt = await approveTx.wait();
-        console.log('✅ Token approval confirmed:', approveTx.hash);
-        console.log('📊 Approval receipt:', receipt);
+        // Check if user has enough balance
+        if (userBalance.lt(amountWei)) {
+          const userBalanceFormatted = ethers.utils.formatUnits(userBalance, decimals);
+          const requiredAmountFormatted = ethers.utils.formatUnits(amountWei, decimals);
+          
+          // Get token symbol from userBalances
+          const tokenInfo = userBalances.find(token => token.address === selectedToken);
+          const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
+          
+          throw new Error(
+            `Insufficient balance! You have ${userBalanceFormatted} ${tokenSymbol}, ` +
+            `but trying to deposit ${requiredAmountFormatted} ${tokenSymbol}. ` +
+            `Please make sure you have enough ${tokenSymbol} in your wallet.`
+          );
+        }
+
+        // Try to approve a reasonable amount first (10x the required amount, but not more than user's balance)
+        let approveAmount = amountWei.mul(10);
+        if (approveAmount.gt(userBalance)) {
+          approveAmount = userBalance; // Don't approve more than user has
+        }
+        
+        console.log('📊 Trying to approve amount:', ethers.utils.formatUnits(approveAmount, decimals));
+
+        try {
+          const approveTx = await tokenContract.approve(vaultAddress, approveAmount, {
+            gasLimit: 100000, // Set explicit gas limit
+          });
+          console.log('⏳ Waiting for approval confirmation...');
+          const receipt = await approveTx.wait();
+          console.log('✅ Token approval confirmed:', approveTx.hash);
+          console.log('📊 Approval receipt:', receipt);
+          
+          // Check if the transaction was successful
+          if (receipt.status === 0) {
+            throw new Error('Approval transaction was reverted');
+          }
+        } catch (approveError) {
+          console.warn('⚠️ Large approval failed, trying exact amount:', approveError.message);
+          
+          // Fallback to exact amount needed
+          approveAmount = amountWei; // Approve exactly what's needed
+          console.log('📊 Fallback approving amount:', ethers.utils.formatUnits(approveAmount, decimals));
+          
+          const fallbackTx = await tokenContract.approve(vaultAddress, approveAmount, {
+            gasLimit: 100000,
+          });
+          const fallbackReceipt = await fallbackTx.wait();
+          
+          if (fallbackReceipt.status === 0) {
+            throw new Error('Fallback approval transaction was also reverted');
+          }
+          
+          console.log('✅ Fallback approval confirmed:', fallbackTx.hash);
+        }
 
         // Verify the approval worked
         currentAllowance = await tokenContract.allowance(userAddress, vaultAddress);
@@ -268,6 +380,9 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         }
       }
 
+      // Note: Vault balance sync is handled automatically by the vault contract
+      // The deposit function will auto-sync before processing
+
       // Execute deposit
       console.log('💰 Executing deposit transaction...');
       setStep('deposit');
@@ -282,13 +397,66 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         );
       }
 
-      const depositTx = await vaultContract.deposit(selectedToken, amountWei);
-      console.log('⏳ Waiting for deposit confirmation...');
-      await depositTx.wait();
+      try {
+        const depositTx = await vaultContract.deposit(selectedToken, amountWei, {
+          gasLimit: 200000, // Set explicit gas limit
+        });
+        console.log('⏳ Waiting for deposit confirmation...');
+        await depositTx.wait();
 
-      console.log('✅ Deposit successful!', depositTx.hash);
-      setSuccess(`Deposit successful! Transaction: ${depositTx.hash}`);
-      setStep('complete');
+        console.log('✅ Deposit successful!', depositTx.hash);
+        setSuccess(`Deposit successful! Transaction: ${depositTx.hash}`);
+        setStep('complete');
+        
+        // Refresh vault balances after successful deposit
+        console.log('🔄 Refreshing vault balances...');
+        await loadVaultBalances();
+      } catch (depositError) {
+        console.error('❌ Deposit transaction failed:', depositError);
+        
+        // Check if it's a gas estimation error
+        if (depositError.message.includes('UNPREDICTABLE_GAS_LIMIT') || 
+            depositError.message.includes('execution reverted')) {
+          
+          // Try to get more specific error information
+          // Check if the vault supports the token
+          const supportedTokens = await vaultContract.getSupportedTokens();
+          const isTokenSupported = supportedTokens.includes(selectedToken);
+          
+          if (!isTokenSupported) {
+            // Get token symbol from userBalances
+            const tokenInfo = userBalances.find(token => token.address === selectedToken);
+            const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
+            
+            throw new Error(
+              `Token ${tokenSymbol} is not registered in the vault. ` +
+              `Please contact support to register this token.`
+            );
+          }
+          
+          // Check if user still has enough balance
+          const currentBalance = await tokenContract.balanceOf(userAddress);
+          if (currentBalance.lt(amountWei)) {
+            // Get token symbol from userBalances
+            const tokenInfo = userBalances.find(token => token.address === selectedToken);
+            const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
+            
+            throw new Error(
+              `Insufficient balance! You have ${ethers.utils.formatUnits(currentBalance, decimals)} ${tokenSymbol}, ` +
+              `but trying to deposit ${ethers.utils.formatUnits(amountWei, decimals)} ${tokenSymbol}.`
+            );
+          }
+          
+          // Generic error if we can't determine the specific cause
+          throw new Error(
+            `Deposit transaction failed. This could be due to: ` +
+            `1) Insufficient gas, 2) Token not registered in vault, 3) Vault contract issue. ` +
+            `Please try again or contact support.`
+          );
+        }
+        
+        throw depositError;
+      }
 
       // Optionally refresh vault balances in parent component
       // refreshVaultStatusFull(); // This would be called in vault-manager
