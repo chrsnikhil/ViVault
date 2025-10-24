@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Bot, 
-  Settings, 
-  Play, 
-  Square, 
-  RefreshCw, 
-  AlertTriangle, 
+import {
+  Bot,
+  Settings,
+  Play,
+  Square,
+  RefreshCw,
+  AlertTriangle,
   CheckCircle,
   TrendingUp,
   Zap,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
-import { automationService, AutomationConfig, AutomationStatus, AutomationHistory } from '@/lib/automation-service';
+import {
+  automationService,
+  AutomationConfig,
+  AutomationStatus,
+  AutomationHistory,
+} from '@/lib/automation-service';
 import { RebalancingService } from '@/lib/rebalancing-service-new';
 import { VincentUniswapSwapService } from '@/lib/vincent-uniswap-swap';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
@@ -38,7 +43,7 @@ interface AutomationPanelProps {
 export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   vaultAddress,
   vaultBalances,
-  pkpAddress
+  pkpAddress,
 }) => {
   const [config, setConfig] = useState<AutomationConfig | null>(null);
   const [status, setStatus] = useState<AutomationStatus | null>(null);
@@ -64,12 +69,12 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       const [statusData, historyData] = await Promise.all([
         automationService.getStatus(),
-        automationService.getHistory()
+        automationService.getHistory(),
       ]);
-      
+
       setConfig(statusData.config);
       setStatus(statusData.status);
       setHistory(historyData.history);
@@ -82,14 +87,14 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
 
   const handleToggleAutomation = async () => {
     if (!config) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       // Simply toggle the enabled flag in the config
       await automationService.updateConfig({ enabled: !config.enabled });
-      
+
       await loadAutomationData();
       setSuccess(config.enabled ? 'Automation disabled' : 'Automation enabled');
     } catch (err) {
@@ -101,11 +106,11 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
 
   const handleUpdateConfig = async () => {
     if (!config) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       await automationService.updateConfig(config);
       await loadAutomationData();
       setIsEditing(false);
@@ -121,10 +126,18 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       // Check if we have the required data
-      if (!vaultAddress || !vaultBalances || vaultBalances.length === 0 || !pkpAddress || !authInfo?.jwt) {
-        setError('Missing vault data or authentication. Please ensure you have a vault with tokens and are logged in.');
+      if (
+        !vaultAddress ||
+        !vaultBalances ||
+        vaultBalances.length === 0 ||
+        !pkpAddress ||
+        !authInfo?.jwt
+      ) {
+        setError(
+          'Missing vault data or authentication. Please ensure you have a vault with tokens and are logged in.'
+        );
         return;
       }
 
@@ -132,13 +145,16 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
       console.log(`🔍 Vault Address: ${vaultAddress}`);
       console.log(`🔍 PKP Address: ${pkpAddress}`);
       console.log(`🔍 Token Count: ${vaultBalances.length}`);
-      console.log(`🔍 Vault Balances:`, vaultBalances.map(b => ({
-        symbol: b.symbol,
-        address: b.address,
-        balance: b.balance,
-        decimals: b.decimals
-      })));
-      
+      console.log(
+        `🔍 Vault Balances:`,
+        vaultBalances.map((b) => ({
+          symbol: b.symbol,
+          address: b.address,
+          balance: b.balance,
+          decimals: b.decimals,
+        }))
+      );
+
       // Use the existing rebalancing service with the same data format as RebalancingPanel
       const result = await rebalancingService.executeRebalancing(
         vaultAddress,
@@ -151,7 +167,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
       if (result.success) {
         setSuccess(`${type} rebalancing executed successfully!`);
         console.log('✅ Force rebalancing completed:', result.transactionHashes);
-        
+
         // Reload automation data to update status
         await loadAutomationData();
       } else {
@@ -168,7 +184,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       await automationService.resetDailyCounter();
       await loadAutomationData();
       setSuccess('Daily counter reset successfully');
@@ -198,9 +214,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
         <CardContent className="p-6">
           <Alert variant="destructive">
             <AlertTriangle className="size-4" />
-            <AlertDescription>
-              Failed to load automation data. Please try again.
-            </AlertDescription>
+            <AlertDescription>Failed to load automation data. Please try again.</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
@@ -209,13 +223,14 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="size-5" />
-          Automated Rebalancing
-        </CardTitle>
-      </CardHeader>
       <CardContent className="space-y-6">
+        {/* Header Section */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Bot className="size-5" />
+            Automated Rebalancing
+          </h3>
+        </div>
         {/* Status Overview */}
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center p-4 bg-muted rounded-lg">
@@ -229,7 +244,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
             </div>
             <div className="text-sm text-muted-foreground">Automation Status</div>
           </div>
-          
+
           <div className="text-center p-4 bg-muted rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {status.dailyRebalancingsCount}/{config.maxDailyRebalancings}
@@ -240,10 +255,10 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
 
         {/* Control Buttons */}
         <div className="flex gap-2">
-          <Button 
+          <Button
             onClick={handleToggleAutomation}
             disabled={loading}
-            variant={config.enabled ? "destructive" : "default"}
+            variant={config.enabled ? 'destructive' : 'default'}
             className="flex-1"
           >
             {config.enabled ? (
@@ -258,12 +273,8 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
               </>
             )}
           </Button>
-          
-          <Button 
-            onClick={() => setIsEditing(!isEditing)}
-            variant="outline"
-            disabled={loading}
-          >
+
+          <Button onClick={() => setIsEditing(!isEditing)} variant="outline" disabled={loading}>
             <Settings className="size-4 mr-2" />
             {isEditing ? 'Cancel' : 'Settings'}
           </Button>
@@ -273,7 +284,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
         {isEditing && (
           <div className="space-y-4 p-4 border rounded-lg">
             <h4 className="font-semibold">Configuration</h4>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="soft-threshold">Soft Threshold (%)</Label>
@@ -281,72 +292,82 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                   id="soft-threshold"
                   type="number"
                   value={config.thresholds.soft}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    thresholds: { ...config.thresholds, soft: parseFloat(e.target.value) }
-                  })}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      thresholds: { ...config.thresholds, soft: parseFloat(e.target.value) },
+                    })
+                  }
                   min="0"
                   step="0.1"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="medium-threshold">Medium Threshold (%)</Label>
                 <Input
                   id="medium-threshold"
                   type="number"
                   value={config.thresholds.medium}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    thresholds: { ...config.thresholds, medium: parseFloat(e.target.value) }
-                  })}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      thresholds: { ...config.thresholds, medium: parseFloat(e.target.value) },
+                    })
+                  }
                   min="0"
                   step="0.1"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="aggressive-threshold">Aggressive Threshold (%)</Label>
                 <Input
                   id="aggressive-threshold"
                   type="number"
                   value={config.thresholds.aggressive}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    thresholds: { ...config.thresholds, aggressive: parseFloat(e.target.value) }
-                  })}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      thresholds: { ...config.thresholds, aggressive: parseFloat(e.target.value) },
+                    })
+                  }
                   min="0"
                   step="0.1"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="cooldown">Cooldown (minutes)</Label>
                 <Input
                   id="cooldown"
                   type="number"
                   value={config.cooldownMinutes}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    cooldownMinutes: parseInt(e.target.value)
-                  })}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      cooldownMinutes: parseInt(e.target.value),
+                    })
+                  }
                   min="0"
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="notifications"
                 checked={config.notificationEnabled}
-                onCheckedChange={(checked) => setConfig({
-                  ...config,
-                  notificationEnabled: checked
-                })}
+                onCheckedChange={(checked) =>
+                  setConfig({
+                    ...config,
+                    notificationEnabled: checked,
+                  })
+                }
               />
               <Label htmlFor="notifications">Enable Notifications</Label>
             </div>
-            
+
             <Button onClick={handleUpdateConfig} disabled={loading} className="w-full">
               <Settings className="size-4 mr-2" />
               Save Configuration
@@ -357,7 +378,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
         {/* Current Status */}
         <div className="space-y-3">
           <h4 className="font-semibold">Current Status</h4>
-          
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Next Rebalancing:</span>
@@ -365,14 +386,18 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                 {automationService.formatTimeRemaining(status.nextAllowedRebalancing)}
               </div>
             </div>
-            
+
             <div>
               <span className="text-muted-foreground">Last Rebalancing:</span>
               <div className="font-medium">
                 {status.lastRebalancing ? (
                   <div className="flex items-center gap-1">
-                    <span>{automationService.getRebalanceTypeIcon(status.lastRebalancing.type)}</span>
-                    <span>{status.lastRebalancing.type} at {status.lastRebalancing.volatility}%</span>
+                    <span>
+                      {automationService.getRebalanceTypeIcon(status.lastRebalancing.type)}
+                    </span>
+                    <span>
+                      {status.lastRebalancing.type} at {status.lastRebalancing.volatility}%
+                    </span>
                   </div>
                 ) : (
                   'Never'
@@ -385,16 +410,20 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
         {/* Force Rebalancing */}
         <div className="space-y-3">
           <h4 className="font-semibold">Force Rebalancing</h4>
-          {!vaultAddress || !vaultBalances || vaultBalances.length === 0 || !authInfo?.pkp.ethAddress ? (
+          {!vaultAddress ||
+          !vaultBalances ||
+          vaultBalances.length === 0 ||
+          !authInfo?.pkp.ethAddress ? (
             <Alert>
               <AlertTriangle className="size-4" />
               <AlertDescription>
-                You need a vault with tokens to use force rebalancing. Please create a vault and deposit some tokens first.
+                You need a vault with tokens to use force rebalancing. Please create a vault and
+                deposit some tokens first.
               </AlertDescription>
             </Alert>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              <Button 
+              <Button
                 onClick={() => handleForceRebalancing('soft')}
                 disabled={loading}
                 variant="outline"
@@ -403,7 +432,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                 <TrendingUp className="size-3 mr-1" />
                 Soft
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleForceRebalancing('medium')}
                 disabled={loading}
                 variant="outline"
@@ -412,7 +441,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                 <Zap className="size-3 mr-1" />
                 Medium
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleForceRebalancing('aggressive')}
                 disabled={loading}
                 variant="outline"
@@ -430,7 +459,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold">Recent Activity</h4>
-              <Button 
+              <Button
                 onClick={handleResetDailyCounter}
                 disabled={loading}
                 variant="outline"
@@ -440,10 +469,13 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                 Reset Daily
               </Button>
             </div>
-            
+
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {history.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                >
                   <div className="flex items-center gap-2">
                     <span>{automationService.getRebalanceTypeIcon(item.type)}</span>
                     <div>
@@ -453,7 +485,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   {item.transactionHashes.length > 0 && (
                     <a
                       href={`https://sepolia.basescan.org/tx/${item.transactionHashes[0]}`}

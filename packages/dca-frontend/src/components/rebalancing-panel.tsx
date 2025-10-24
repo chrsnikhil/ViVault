@@ -1,23 +1,34 @@
 import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { 
-  TrendingUp, 
-  RefreshCw, 
-  CheckCircle, 
+import {
+  TrendingUp,
+  RefreshCw,
+  CheckCircle,
   AlertTriangle,
   Loader2,
   DollarSign,
   BarChart3,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
-import { RebalancingService, RebalanceType, RebalancePreview, RebalanceResult } from '@/lib/rebalancing-service-new';
+import {
+  RebalancingService,
+  RebalanceType,
+  RebalancePreview,
+  RebalanceResult,
+} from '@/lib/rebalancing-service-new';
 import { VincentUniswapSwapService } from '@/lib/vincent-uniswap-swap';
 import { COMMON_TOKENS } from '@/config/contracts';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
@@ -40,7 +51,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
   vaultAddress,
   vaultBalances,
   pkpAddress,
-  onRebalanceComplete
+  onRebalanceComplete,
 }) => {
   const { authInfo } = useJwtContext();
   const [selectedType, setSelectedType] = useState<RebalanceType>('soft');
@@ -69,10 +80,10 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
 
     try {
       console.log('🔍 Generating rebalancing preview with route validation...');
-      
+
       // Filter out tokens that shouldn't be rebalanced
-      const rebalanceableTokens = vaultBalances.filter(token => 
-        !rebalancingService.shouldExcludeToken(token.address, token.symbol)
+      const rebalanceableTokens = vaultBalances.filter(
+        (token) => !rebalancingService.shouldExcludeToken(token.address, token.symbol)
       );
 
       if (rebalanceableTokens.length === 0) {
@@ -81,13 +92,18 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
       }
 
       // Use route-validated preview
-      const preview = await rebalancingService.calculateRebalancePlanWithRoutes(rebalanceableTokens, selectedType);
+      const preview = await rebalancingService.calculateRebalancePlanWithRoutes(
+        rebalanceableTokens,
+        selectedType
+      );
       setPreview(preview);
-      
+
       if (preview.tokenPlans.length === 0) {
-        setError('No valid swap routes found for any tokens. Only WETH -> USDC routes are available on Base Sepolia.');
+        setError(
+          'No valid swap routes found for any tokens. Only WETH -> USDC routes are available on Base Sepolia.'
+        );
       }
-      
+
       console.log('✅ Preview generated with route validation:', preview);
     } catch (err) {
       console.error('❌ Error generating preview:', err);
@@ -110,9 +126,9 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
 
     try {
       console.log('🚀 Executing rebalancing...');
-      
-      const rebalanceableTokens = vaultBalances.filter(token => 
-        !rebalancingService.shouldExcludeToken(token.address, token.symbol)
+
+      const rebalanceableTokens = vaultBalances.filter(
+        (token) => !rebalancingService.shouldExcludeToken(token.address, token.symbol)
       );
 
       const result = await rebalancingService.executeRebalancing(
@@ -124,7 +140,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
       );
 
       setResult(result);
-      
+
       if (result.success) {
         console.log('✅ Rebalancing completed successfully');
         onRebalanceComplete?.(result);
@@ -137,32 +153,44 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
     } finally {
       setIsExecuting(false);
     }
-  }, [preview, vaultBalances, selectedType, vaultAddress, pkpAddress, rebalancingService, onRebalanceComplete, authInfo?.jwt]);
+  }, [
+    preview,
+    vaultBalances,
+    selectedType,
+    vaultAddress,
+    pkpAddress,
+    rebalancingService,
+    onRebalanceComplete,
+    authInfo?.jwt,
+  ]);
 
   // Get configuration for selected type
   const config = rebalancingService.getRebalanceConfig(selectedType);
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="size-5" />
-          Portfolio Rebalancing
-        </CardTitle>
-        <CardDescription>
-          Automatically rebalance your portfolio by converting a percentage of tokens to USDC.
-          <br />
-          <span className="text-xs text-muted-foreground">
-            Note: Only WETH → USDC routes are currently available on Base Sepolia.
-          </span>
-        </CardDescription>
-      </CardHeader>
-
       <CardContent className="space-y-6">
+        {/* Header Section */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <BarChart3 className="size-5" />
+            Portfolio Rebalancing
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Automatically rebalance your portfolio by converting a percentage of tokens to USDC.
+            <br />
+            <span className="text-xs text-muted-foreground">
+              Note: Only WETH → USDC routes are currently available on Base Sepolia.
+            </span>
+          </p>
+        </div>
         {/* Strategy Selection */}
         <div className="space-y-3">
           <Label htmlFor="rebalance-type">Rebalancing Strategy</Label>
-          <Select value={selectedType} onValueChange={(value: RebalanceType) => setSelectedType(value)}>
+          <Select
+            value={selectedType}
+            onValueChange={(value: RebalanceType) => setSelectedType(value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select rebalancing strategy" />
             </SelectTrigger>
@@ -178,7 +206,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
               ))}
             </SelectContent>
           </Select>
-          
+
           {/* Strategy Description */}
           <div className="p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-2 mb-1">
@@ -191,8 +219,8 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
 
         {/* Preview Button */}
         <div className="flex gap-2">
-          <Button 
-            onClick={generatePreview} 
+          <Button
+            onClick={generatePreview}
             disabled={isGeneratingPreview || !vaultBalances.length}
             className="flex-1"
           >
@@ -208,26 +236,28 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
               </>
             )}
           </Button>
-          
+
           {/* Debug Test Button */}
-          <Button 
+          <Button
             variant="outline"
             onClick={async () => {
               console.log('🧪 Testing vault tokens -> USDC routes...');
-              
+
               // Test each token in the vault
               for (const token of vaultBalances) {
                 if (!rebalancingService.shouldExcludeToken(token.address, token.symbol)) {
                   console.log(`🧪 Testing ${token.symbol} -> USDC...`);
                   const hasRoute = await rebalancingService.testTokenRoute(
-                    token.address, 
-                    COMMON_TOKENS.USDC, 
+                    token.address,
+                    COMMON_TOKENS.USDC,
                     '0.001'
                   );
-                  console.log(`🧪 ${token.symbol} result: ${hasRoute ? 'ROUTE EXISTS' : 'NO ROUTE'}`);
+                  console.log(
+                    `🧪 ${token.symbol} result: ${hasRoute ? 'ROUTE EXISTS' : 'NO ROUTE'}`
+                  );
                 }
               }
-              
+
               setError('Check console for route test results');
             }}
             disabled={isGeneratingPreview}
@@ -242,13 +272,13 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
         {preview && (
           <div className="space-y-4">
             <Separator />
-            
+
             <div className="space-y-3">
               <h4 className="font-semibold flex items-center gap-2">
                 <TrendingUp className="size-4" />
                 Rebalancing Preview
               </h4>
-              
+
               {/* Summary */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                 <div className="text-center">
@@ -268,7 +298,10 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
                 <h5 className="font-medium">Token Breakdown</h5>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {preview.tokenPlans.map((plan) => (
-                    <div key={plan.tokenAddress} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div
+                      key={plan.tokenAddress}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{plan.symbol}</span>
                         <Badge variant="secondary" className="text-xs">
@@ -276,9 +309,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
                         </Badge>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-medium">
-                          {plan.amountToSwap} → USDC
-                        </div>
+                        <div className="text-sm font-medium">{plan.amountToSwap} → USDC</div>
                         <div className="text-xs text-muted-foreground">
                           {plan.remainingBalance} remaining
                         </div>
@@ -290,7 +321,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
             </div>
 
             {/* Execute Button */}
-            <Button 
+            <Button
               onClick={executeRebalancing}
               disabled={isExecuting}
               className="w-full"
@@ -315,7 +346,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
         {result && (
           <div className="space-y-3">
             <Separator />
-            
+
             <div className="space-y-3">
               <h4 className="font-semibold flex items-center gap-2">
                 {result.success ? (
@@ -330,7 +361,8 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
                 <Alert>
                   <CheckCircle className="size-4" />
                   <AlertDescription>
-                    Rebalancing completed successfully! {result.transactionHashes.length} swaps executed.
+                    Rebalancing completed successfully! {result.transactionHashes.length} swaps
+                    executed.
                     {result.totalUSDCReceived && ` Received ~${result.totalUSDCReceived} USDC.`}
                   </AlertDescription>
                 </Alert>
@@ -352,7 +384,10 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
                       const stepNames = ['Withdraw from Vault', 'Approve Router', 'Execute Swap'];
                       const stepName = stepNames[index] || `Transaction ${index + 1}`;
                       return (
-                        <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                        >
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{stepName}</span>
                           </div>

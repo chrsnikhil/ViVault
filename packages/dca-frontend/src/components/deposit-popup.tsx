@@ -54,6 +54,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
   const [userBalances, setUserBalances] = useState<TokenBalance[]>([]);
   const [vaultBalances, setVaultBalances] = useState<TokenBalance[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -73,34 +74,38 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const userAddress = await signer.getAddress();
-      
+
       console.log('🔍 User address:', userAddress);
 
       // Check balances for WETH and USDC
       const tokensToCheck = [
         { address: '0x4200000000000000000000000000000000000006', symbol: 'WETH', decimals: 18 },
-        { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', symbol: 'USDC', decimals: 6 }
+        { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', symbol: 'USDC', decimals: 6 },
       ];
 
       const balances: TokenBalance[] = [];
 
       for (const token of tokensToCheck) {
         try {
-          const tokenContract = new ethers.Contract(token.address, [
-            'function balanceOf(address owner) view returns (uint256)',
-            'function symbol() view returns (string)',
-            'function decimals() view returns (uint8)'
-          ], provider);
+          const tokenContract = new ethers.Contract(
+            token.address,
+            [
+              'function balanceOf(address owner) view returns (uint256)',
+              'function symbol() view returns (string)',
+              'function decimals() view returns (uint8)',
+            ],
+            provider
+          );
 
           const balance = await tokenContract.balanceOf(userAddress);
-          
+
           if (balance.gt(0)) {
             balances.push({
               address: token.address,
               symbol: token.symbol,
               balance: ethers.utils.formatUnits(balance, token.decimals),
               decimals: token.decimals,
-              rawBalance: balance
+              rawBalance: balance,
             });
             console.log(`✅ ${token.symbol}: ${ethers.utils.formatUnits(balance, token.decimals)}`);
           }
@@ -290,6 +295,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
       if (currentAllowance.lt(amountWei)) {
         console.log('🔓 Approving token spending...');
         setStep('approve');
+        setIsApproving(true);
 
         // Check user's actual balance first
         const userBalance = await tokenContract.balanceOf(userAddress);
@@ -300,15 +306,15 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         if (userBalance.lt(amountWei)) {
           const userBalanceFormatted = ethers.utils.formatUnits(userBalance, decimals);
           const requiredAmountFormatted = ethers.utils.formatUnits(amountWei, decimals);
-          
+
           // Get token symbol from userBalances
-          const tokenInfo = userBalances.find(token => token.address === selectedToken);
+          const tokenInfo = userBalances.find((token) => token.address === selectedToken);
           const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
-          
+
           throw new Error(
             `Insufficient balance! You have ${userBalanceFormatted} ${tokenSymbol}, ` +
-            `but trying to deposit ${requiredAmountFormatted} ${tokenSymbol}. ` +
-            `Please make sure you have enough ${tokenSymbol} in your wallet.`
+              `but trying to deposit ${requiredAmountFormatted} ${tokenSymbol}. ` +
+              `Please make sure you have enough ${tokenSymbol} in your wallet.`
           );
         }
 
@@ -317,8 +323,11 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         if (approveAmount.gt(userBalance)) {
           approveAmount = userBalance; // Don't approve more than user has
         }
-        
-        console.log('📊 Trying to approve amount:', ethers.utils.formatUnits(approveAmount, decimals));
+
+        console.log(
+          '📊 Trying to approve amount:',
+          ethers.utils.formatUnits(approveAmount, decimals)
+        );
 
         try {
           const approveTx = await tokenContract.approve(vaultAddress, approveAmount, {
@@ -328,27 +337,30 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
           const receipt = await approveTx.wait();
           console.log('✅ Token approval confirmed:', approveTx.hash);
           console.log('📊 Approval receipt:', receipt);
-          
+
           // Check if the transaction was successful
           if (receipt.status === 0) {
             throw new Error('Approval transaction was reverted');
           }
         } catch (approveError) {
           console.warn('⚠️ Large approval failed, trying exact amount:', approveError.message);
-          
+
           // Fallback to exact amount needed
           approveAmount = amountWei; // Approve exactly what's needed
-          console.log('📊 Fallback approving amount:', ethers.utils.formatUnits(approveAmount, decimals));
-          
+          console.log(
+            '📊 Fallback approving amount:',
+            ethers.utils.formatUnits(approveAmount, decimals)
+          );
+
           const fallbackTx = await tokenContract.approve(vaultAddress, approveAmount, {
             gasLimit: 100000,
           });
           const fallbackReceipt = await fallbackTx.wait();
-          
+
           if (fallbackReceipt.status === 0) {
             throw new Error('Fallback approval transaction was also reverted');
           }
-          
+
           console.log('✅ Fallback approval confirmed:', fallbackTx.hash);
         }
 
@@ -378,6 +390,8 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
               `Please check if the approval transaction was successful in MetaMask.`
           );
         }
+
+        setIsApproving(false);
       }
 
       // Note: Vault balance sync is handled automatically by the vault contract
@@ -405,56 +419,58 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         await depositTx.wait();
 
         console.log('✅ Deposit successful!', depositTx.hash);
-        setSuccess(`Deposit successful! Transaction: ${depositTx.hash}`);
+        setSuccess(depositTx.hash);
         setStep('complete');
-        
+        setIsDepositing(false); // Stop the depositing state
+
         // Refresh vault balances after successful deposit
         console.log('🔄 Refreshing vault balances...');
         await loadVaultBalances();
       } catch (depositError) {
         console.error('❌ Deposit transaction failed:', depositError);
-        
+
         // Check if it's a gas estimation error
-        if (depositError.message.includes('UNPREDICTABLE_GAS_LIMIT') || 
-            depositError.message.includes('execution reverted')) {
-          
+        if (
+          depositError.message.includes('UNPREDICTABLE_GAS_LIMIT') ||
+          depositError.message.includes('execution reverted')
+        ) {
           // Try to get more specific error information
           // Check if the vault supports the token
           const supportedTokens = await vaultContract.getSupportedTokens();
           const isTokenSupported = supportedTokens.includes(selectedToken);
-          
+
           if (!isTokenSupported) {
             // Get token symbol from userBalances
-            const tokenInfo = userBalances.find(token => token.address === selectedToken);
+            const tokenInfo = userBalances.find((token) => token.address === selectedToken);
             const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
-            
+
             throw new Error(
               `Token ${tokenSymbol} is not registered in the vault. ` +
-              `Please contact support to register this token.`
+                `Please contact support to register this token.`
             );
           }
-          
+
           // Check if user still has enough balance
           const currentBalance = await tokenContract.balanceOf(userAddress);
           if (currentBalance.lt(amountWei)) {
             // Get token symbol from userBalances
-            const tokenInfo = userBalances.find(token => token.address === selectedToken);
+            const tokenInfo = userBalances.find((token) => token.address === selectedToken);
             const tokenSymbol = tokenInfo?.symbol || 'Unknown Token';
-            
+
             throw new Error(
               `Insufficient balance! You have ${ethers.utils.formatUnits(currentBalance, decimals)} ${tokenSymbol}, ` +
-              `but trying to deposit ${ethers.utils.formatUnits(amountWei, decimals)} ${tokenSymbol}.`
+                `but trying to deposit ${ethers.utils.formatUnits(amountWei, decimals)} ${tokenSymbol}.`
             );
           }
-          
+
           // Generic error if we can't determine the specific cause
           throw new Error(
             `Deposit transaction failed. This could be due to: ` +
-            `1) Insufficient gas, 2) Token not registered in vault, 3) Vault contract issue. ` +
-            `Please try again or contact support.`
+              `1) Insufficient gas, 2) Token not registered in vault, 3) Vault contract issue. ` +
+              `Please try again or contact support.`
           );
         }
-        
+
         throw depositError;
       }
 
@@ -465,6 +481,7 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
       setError(err instanceof Error ? err.message : 'Deposit failed');
       setStep('select'); // Go back to select step on error
     } finally {
+      setIsApproving(false);
       setIsDepositing(false);
     }
   };
@@ -657,7 +674,17 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
             <Alert className="p-3">
               <CheckCircle className="size-4" />
               <AlertDescription className="text-sm">
-                {success.length > 50 ? `${success.slice(0, 50)}...` : success}
+                <div className="flex items-center gap-2">
+                  <span>Deposit successful!</span>
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${success}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-black hover:text-gray-600 dark:text-white dark:hover:text-gray-300 underline font-mono text-xs"
+                  >
+                    View on BaseScan Sepolia
+                  </a>
+                </div>
               </AlertDescription>
             </Alert>
           )}
