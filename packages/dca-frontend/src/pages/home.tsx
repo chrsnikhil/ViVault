@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ComponentGallery from '@/components/component-gallery';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { VaultManager } from '@/components/vault-manager';
 import { PriceFeedPage } from '@/pages/price-feed';
 import {
   Menu,
@@ -242,6 +241,7 @@ export const Home: React.FC = () => {
               <Button
                 size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                onClick={() => (window.location.href = '/dashboard')}
               >
                 Launch Vault
                 <ArrowRight className="size-4 ml-2" />
@@ -404,21 +404,6 @@ export const Home: React.FC = () => {
                 </CardContent>
               </Card>
             </motion.div>
-          </motion.div>
-        </section>
-
-        {/* Vault Manager */}
-        <section className="mx-auto max-w-7xl px-6 pb-20">
-          <motion.div className="mb-8" variants={fadeInUp}>
-            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
-              ViVault Manager
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              Manage your volatility-based portfolio vault with advanced strategies.
-            </p>
-          </motion.div>
-          <motion.div variants={fadeInUp}>
-            <VaultManager />
           </motion.div>
         </section>
 

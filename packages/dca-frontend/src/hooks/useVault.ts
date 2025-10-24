@@ -151,7 +151,10 @@ export const useVault = () => {
       // Automatically register common tokens in the new vault
       try {
         console.log('🔍 Auto-registering common tokens in new vault...');
-        const commonTokens = [COMMON_TOKENS.WETH, COMMON_TOKENS.USDC];
+        const commonTokens = [
+          '0x4200000000000000000000000000000000000006', // WETH
+          '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+        ];
         await registerExistingTokens(vaultAddress, commonTokens);
         console.log('✅ Common tokens auto-registered in new vault');
       } catch (autoRegisterError) {
@@ -380,7 +383,7 @@ export const useVault = () => {
         );
 
         // Filter out tokens with zero balance to avoid cluttering the UI
-        const nonZeroBalances = balances.filter(balance => {
+        const nonZeroBalances = balances.filter((balance) => {
           const balanceWei = ethers.BigNumber.from(balance.balance);
           return balanceWei.gt(0);
         });
@@ -410,7 +413,7 @@ export const useVault = () => {
       tokenAddress: string,
       amount: string,
       recipientAddress: string
-    ): Promise<void> => {
+    ): Promise<string> => {
       if (!authInfo?.pkp.ethAddress) {
         throw new Error('No Vincent PKP wallet connected');
       }
@@ -479,6 +482,7 @@ export const useVault = () => {
         }
 
         console.log('✅ Tokens withdrawn successfully with Vincent PKP');
+        return tx.hash;
       } catch (err: unknown) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to withdraw tokens with Vincent PKP';
@@ -552,8 +556,8 @@ export const useVault = () => {
       try {
         // Check common tokens first, then any other tokens that might have balances
         const tokensToCheck = [
-          COMMON_TOKENS.WETH,
-          COMMON_TOKENS.USDC,
+          '0x4200000000000000000000000000000000000006', // WETH
+          '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
           // Add any other tokens you want to check
         ];
 

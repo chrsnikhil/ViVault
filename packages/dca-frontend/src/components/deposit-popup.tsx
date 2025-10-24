@@ -318,15 +318,32 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
           );
         }
 
-        // Try to approve a reasonable amount first (10x the required amount, but not more than user's balance)
-        let approveAmount = amountWei.mul(10);
-        if (approveAmount.gt(userBalance)) {
-          approveAmount = userBalance; // Don't approve more than user has
+        // Try to approve a reasonable amount first
+        // For USDC, be more conservative with approval amounts
+        const isUSDC = selectedToken.toLowerCase() === '0x036cbd53842c5426634e7929541ec2318f3dcf7e';
+        let approveAmount;
+
+        if (isUSDC) {
+          // For USDC, approve exactly what's needed plus a small buffer (2x)
+          approveAmount = amountWei.mul(2);
+          if (approveAmount.gt(userBalance)) {
+            approveAmount = userBalance; // Don't approve more than user has
+          }
+        } else {
+          // For other tokens (like WETH), use 10x the required amount
+          approveAmount = amountWei.mul(10);
+          if (approveAmount.gt(userBalance)) {
+            approveAmount = userBalance; // Don't approve more than user has
+          }
         }
 
         console.log(
           '📊 Trying to approve amount:',
           ethers.utils.formatUnits(approveAmount, decimals)
+        );
+        console.log(
+          '📊 Token type:',
+          isUSDC ? 'USDC (conservative approval)' : 'Other token (standard approval)'
         );
 
         try {
@@ -337,6 +354,12 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
           const receipt = await approveTx.wait();
           console.log('✅ Token approval confirmed:', approveTx.hash);
           console.log('📊 Approval receipt:', receipt);
+
+          // For USDC, add a small delay to ensure approval is processed
+          if (isUSDC) {
+            console.log('⏳ Waiting for USDC approval to be processed...');
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
 
           // Check if the transaction was successful
           if (receipt.status === 0) {
@@ -362,6 +385,12 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
           }
 
           console.log('✅ Fallback approval confirmed:', fallbackTx.hash);
+
+          // For USDC, add a small delay after fallback approval too
+          if (isUSDC) {
+            console.log('⏳ Waiting for USDC fallback approval to be processed...');
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
         }
 
         // Verify the approval worked
@@ -419,13 +448,15 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
         await depositTx.wait();
 
         console.log('✅ Deposit successful!', depositTx.hash);
-        setSuccess(depositTx.hash);
         setStep('complete');
         setIsDepositing(false); // Stop the depositing state
 
         // Refresh vault balances after successful deposit
         console.log('🔄 Refreshing vault balances...');
         await loadVaultBalances();
+
+        // Set success only after everything is complete
+        setSuccess(depositTx.hash);
       } catch (depositError) {
         console.error('❌ Deposit transaction failed:', depositError);
 
@@ -479,10 +510,12 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
     } catch (err: unknown) {
       console.error('❌ Deposit failed:', err);
       setError(err instanceof Error ? err.message : 'Deposit failed');
+      setSuccess(null); // Clear any previous success state
       setStep('select'); // Go back to select step on error
     } finally {
       setIsApproving(false);
       setIsDepositing(false);
+      // Don't reset success here - only reset on error or new deposit start
     }
   };
 

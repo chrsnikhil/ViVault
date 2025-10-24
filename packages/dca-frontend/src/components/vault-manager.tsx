@@ -362,8 +362,14 @@ export const VaultManager: React.FC = () => {
       if (!vaultAddress || !selectedTokenForWithdraw)
         throw new Error('No vault address or token selected');
 
-      await withdraw(vaultAddress, selectedTokenForWithdraw.address, amount, recipientAddress);
+      const txHash = await withdraw(
+        vaultAddress,
+        selectedTokenForWithdraw.address,
+        amount,
+        recipientAddress
+      );
       await refreshVaultStatusFull();
+      return txHash;
     } catch (err) {
       console.error('❌ Error withdrawing:', err);
       throw err;
@@ -737,11 +743,11 @@ export const VaultManager: React.FC = () => {
               {vaultInfo && vaultInfo.balances && vaultInfo.balances.length > 0 && (
                 <RebalancingPanel
                   vaultAddress={vaultAddress || ''}
-                  vaultBalances={vaultInfo.balances.map(balance => ({
+                  vaultBalances={vaultInfo.balances.map((balance) => ({
                     address: balance.address,
                     symbol: balance.symbol,
                     balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
-                    decimals: balance.decimals
+                    decimals: balance.decimals,
                   }))}
                   pkpAddress={authInfo?.pkp.ethAddress || ''}
                   onRebalanceComplete={(result) => {
@@ -756,11 +762,11 @@ export const VaultManager: React.FC = () => {
               {vaultInfo && vaultInfo.balances && vaultInfo.balances.length > 0 && (
                 <AutomationPanel
                   vaultAddress={vaultAddress || ''}
-                  vaultBalances={vaultInfo.balances.map(balance => ({
+                  vaultBalances={vaultInfo.balances.map((balance) => ({
                     address: balance.address,
                     symbol: balance.symbol,
                     balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
-                    decimals: balance.decimals
+                    decimals: balance.decimals,
                   }))}
                   pkpAddress={authInfo?.pkp.ethAddress || ''}
                 />
@@ -1146,12 +1152,14 @@ export const VaultManager: React.FC = () => {
         isOpen={swapPopupOpen}
         onClose={() => setSwapPopupOpen(false)}
         vaultAddress={vaultAddress || ''}
-        vaultBalances={vaultInfo?.balances?.map(balance => ({
-          address: balance.address,
-          symbol: balance.symbol,
-          balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
-          decimals: balance.decimals
-        })) || []}
+        vaultBalances={
+          vaultInfo?.balances?.map((balance) => ({
+            address: balance.address,
+            symbol: balance.symbol,
+            balance: ethers.utils.formatUnits(balance.balance, balance.decimals),
+            decimals: balance.decimals,
+          })) || []
+        }
         onSwapComplete={() => {
           console.log('Swap completed, refreshing vault data');
           loadVaultInfo();

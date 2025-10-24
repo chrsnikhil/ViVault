@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Copy, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, Copy, ExternalLink, CheckCircle } from 'lucide-react';
 import { ethers } from 'ethers';
 
 interface WithdrawPopupProps {
@@ -23,7 +23,7 @@ interface WithdrawPopupProps {
   tokenSymbol: string;
   tokenBalance: string;
   tokenDecimals: number;
-  onWithdraw: (recipientAddress: string, amount: string) => Promise<void>;
+  onWithdraw: (recipientAddress: string, amount: string) => Promise<string>;
   loading?: boolean;
 }
 
@@ -40,6 +40,7 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleWithdraw = async () => {
     setError(null);
@@ -75,12 +76,14 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
       // Convert amount to wei (considering token decimals)
       const amountWei = ethers.utils.parseUnits(amount, tokenDecimals);
 
-      await onWithdraw(recipientAddress, amountWei.toString());
+      const txHash = await onWithdraw(recipientAddress, amountWei.toString());
 
-      // Reset form on success
+      // Show success with transaction hash
+      setSuccess(txHash);
+
+      // Reset form but keep popup open to show success
       setRecipientAddress('');
       setAmount('');
-      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to withdraw tokens');
     }
@@ -91,6 +94,7 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
       setRecipientAddress('');
       setAmount('');
       setError(null);
+      setSuccess(null);
       onClose();
     }
   };
@@ -108,10 +112,19 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span>Withdraw {tokenSymbol}</span>
+            {success ? (
+              <>
+                <CheckCircle className="size-5 text-green-500" />
+                <span>Withdrawal Successful!</span>
+              </>
+            ) : (
+              <span>Withdraw {tokenSymbol}</span>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Send {tokenSymbol} tokens from your vault to another wallet address.
+            {success
+              ? `Your ${tokenSymbol} tokens have been successfully withdrawn.`
+              : `Send ${tokenSymbol} tokens from your vault to another wallet address.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -157,7 +170,7 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
               placeholder="0x..."
               value={recipientAddress}
               onChange={(e) => setRecipientAddress(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!success}
             />
           </div>
 
@@ -172,10 +185,15 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
                 placeholder="0.0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                disabled={loading}
+                disabled={loading || !!success}
                 className="flex-1"
               />
-              <Button variant="outline" onClick={setMaxAmount} disabled={loading} className="px-3">
+              <Button
+                variant="outline"
+                onClick={setMaxAmount}
+                disabled={loading || !!success}
+                className="px-3"
+              >
                 Max
               </Button>
             </div>
@@ -189,8 +207,28 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
             </Alert>
           )}
 
+          {/* Success Display */}
+          {success && (
+            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              <CheckCircle className="size-4" />
+              <AlertDescription>
+                <div className="flex items-center gap-2">
+                  <span>Withdrawal successful!</span>
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${success}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-black hover:text-gray-600 dark:text-white dark:hover:text-gray-300 underline font-mono text-xs"
+                  >
+                    View on BaseScan Sepolia
+                  </a>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Transaction Preview */}
-          {recipientAddress && amount && !error && (
+          {recipientAddress && amount && !error && !success && (
             <div className="p-3 bg-muted/50 rounded-lg">
               <h4 className="text-sm font-medium mb-2">Transaction Preview</h4>
               <div className="space-y-1 text-sm">
@@ -216,26 +254,34 @@ export const WithdrawPopup: React.FC<WithdrawPopupProps> = ({
         </div>
 
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={handleClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleWithdraw}
-            disabled={loading || !recipientAddress || !amount}
-            className="flex-1"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="size-4 mr-2 animate-spin" />
-                Withdrawing...
-              </>
-            ) : (
-              <>
-                <ExternalLink className="size-4 mr-2" />
-                Withdraw {tokenSymbol}
-              </>
-            )}
-          </Button>
+          {success ? (
+            <Button onClick={handleClose} className="flex-1">
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose} disabled={loading}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleWithdraw}
+                disabled={loading || !recipientAddress || !amount}
+                className="flex-1"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    Withdrawing...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="size-4 mr-2" />
+                    Withdraw {tokenSymbol}
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

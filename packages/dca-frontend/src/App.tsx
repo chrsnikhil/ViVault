@@ -12,13 +12,25 @@ import './App.css';
 
 import { Home } from '@/pages/home';
 import { Login } from '@/pages/login';
+import { Dashboard } from '@/pages/dashboard';
 
 const { VITE_APP_ID } = env;
 
 function AppContent() {
   const { authInfo } = useJwtContext();
 
-  return authInfo ? <Home /> : <Login />;
+  if (!authInfo) {
+    return <Login />;
+  }
+
+  // Simple routing based on URL path
+  const path = window.location.pathname;
+
+  if (path === '/dashboard') {
+    return <Dashboard />;
+  }
+
+  return <Home />;
 }
 
 function App() {
