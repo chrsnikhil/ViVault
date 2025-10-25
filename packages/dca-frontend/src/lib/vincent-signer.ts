@@ -9,6 +9,20 @@ export class VincentSigner {
   private delegateeSigner: ethers.Wallet;
   private jwt: string;
 
+  private decodeJWT(jwt: string): Record<string, unknown> | { error: string; details?: string } {
+    try {
+      const parts = jwt.split('.');
+      if (parts.length !== 3) {
+        return { error: 'Invalid JWT format' };
+      }
+      const payload = parts[1];
+      const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(decoded);
+    } catch (error) {
+      return { error: 'Failed to decode JWT', details: error.message };
+    }
+  }
+
   constructor(rpcUrl: string, pkpAddress: string, delegateePrivateKey: string, jwt: string) {
     this.pkpAddress = pkpAddress;
     this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
@@ -17,11 +31,51 @@ export class VincentSigner {
     // Create delegatee signer for authorization
     this.delegateeSigner = new ethers.Wallet(delegateePrivateKey, this.provider);
 
+    // Validate JWT format
+    if (!jwt || jwt.length < 100) {
+      throw new Error(`Invalid JWT token: length=${jwt?.length}, token=${jwt}`);
+    }
+
+    // Validate PKP address format
+    if (!pkpAddress || !pkpAddress.startsWith('0x') || pkpAddress.length !== 42) {
+      throw new Error(`Invalid PKP address: ${pkpAddress}`);
+    }
+
     // Initialize Vincent ability client with EVM Transaction Signer Ability
-    this.abilityClient = getVincentAbilityClient({
-      bundledVincentAbility: bundledVincentAbility,
-      ethersSigner: this.delegateeSigner,
-    });
+    try {
+      const jwtPayload = this.decodeJWT(jwt);
+      console.log('🔍 VincentSigner: JWT payload (decoded):', jwtPayload);
+      console.log('🔍 VincentSigner: JWT payload keys:', Object.keys(jwtPayload));
+      console.log('🔍 VincentSigner: PKP Address from JWT:', pkpAddress);
+      console.log(
+        '🔍 VincentSigner: Is this the working PKP wallet?',
+        pkpAddress === '0xcc68b13b4Bd8D8fC9d797282Bf9b927F79fcC470'
+      );
+
+      if (jwtPayload.pkpInfo) {
+        console.log('🔍 VincentSigner: PKP Info:', jwtPayload.pkpInfo);
+      }
+      if (jwtPayload.app) {
+        console.log('🔍 VincentSigner: App Info:', jwtPayload.app);
+      }
+      if (jwtPayload.authentication) {
+        console.log('🔍 VincentSigner: Auth Info:', jwtPayload.authentication);
+      }
+
+      // Log specific fields that might differ between PKP wallets
+      console.log('🔍 VincentSigner: JWT exp:', jwtPayload.exp);
+      console.log('🔍 VincentSigner: JWT iat:', jwtPayload.iat);
+      console.log('🔍 VincentSigner: JWT iss:', jwtPayload.iss);
+      console.log('🔍 VincentSigner: JWT aud:', jwtPayload.aud);
+      this.abilityClient = getVincentAbilityClient({
+        bundledVincentAbility: bundledVincentAbility,
+        ethersSigner: this.delegateeSigner,
+        jwt: jwt,
+      });
+    } catch (error) {
+      console.error('❌ VincentSigner: Failed to initialize ability client:', error);
+      throw error;
+    }
 
     console.log('🔍 ===== VincentSigner INITIALIZATION =====');
     console.log('🔍 VincentSigner: Initialized with EVM Transaction Signer Ability');
@@ -31,8 +85,9 @@ export class VincentSigner {
       '🔍 VincentSigner: Delegatee Private Key (first 10 chars):',
       delegateePrivateKey.substring(0, 10) + '...'
     );
-    console.log('🔍 VincentSigner: JWT stored (first 20 chars):', jwt.substring(0, 20) + '...');
-    console.log('🔍 VincentSigner: Full JWT:', jwt);
+    console.log('🔍 VincentSigner: JWT length:', jwt.length);
+    console.log('🔍 VincentSigner: JWT (first 50 chars):', jwt.substring(0, 50) + '...');
+    console.log('🔍 VincentSigner: JWT (last 50 chars):', '...' + jwt.substring(jwt.length - 50));
     console.log('🔍 ========================================');
   }
 
@@ -73,14 +128,21 @@ export class VincentSigner {
 
       // Call precheck function
       console.log('🔍 VincentSigner: Calling precheck...');
-      console.log('precheck', {
-        rawAbilityParams: { serializedTransaction: serializedTx },
-        delegatorPkpEthAddress: '0xcc68b13b4Bd8D8fC9d797282Bf9b927F79fcC470', // Hardcoded user PKP address
-        rpcUrl: undefined,
+      console.log('🔍 VincentSigner: Precheck params:', {
+        serializedTransaction: serializedTx.substring(0, 100) + '...',
+        delegatorPkpEthAddress: this.pkpAddress,
+        serializedTransactionLength: serializedTx.length,
       });
+
+      // Add detailed debugging before precheck
+      console.log('🔍 VincentSigner: About to call precheck with:');
+      console.log('  - PKP Address:', this.pkpAddress);
+      console.log('  - JWT length:', this.jwt.length);
+      console.log('  - Serialized TX length:', serializedTx.length);
+
       const precheckResult = await this.abilityClient.precheck(
         { serializedTransaction: serializedTx },
-        { delegatorPkpEthAddress: '0xcc68b13b4Bd8D8fC9d797282Bf9b927F79fcC470' } // Hardcoded user PKP address
+        { delegatorPkpEthAddress: this.pkpAddress } // Use actual user's PKP address
       );
 
       console.log('🔍 VincentSigner: Precheck result:', precheckResult);
@@ -159,10 +221,36 @@ export class VincentSigner {
 
       // Call execute function to sign the transaction
       console.log('🔍 VincentSigner: Calling execute to sign transaction...');
-      const executeResult = await this.abilityClient.execute(
-        { serializedTransaction },
-        { delegatorPkpEthAddress: '0xcc68b13b4Bd8D8fC9d797282Bf9b927F79fcC470' } // Hardcoded user PKP address
-      );
+      console.log('🔍 VincentSigner: Execute params:', {
+        serializedTransaction: serializedTransaction.substring(0, 100) + '...',
+        delegatorPkpEthAddress: this.pkpAddress,
+        serializedTransactionLength: serializedTransaction.length,
+      });
+
+      // Add detailed debugging before execute
+      console.log('🔍 VincentSigner: About to call execute with:');
+      console.log('  - PKP Address:', this.pkpAddress);
+      console.log('  - JWT length:', this.jwt.length);
+      console.log('  - JWT starts with:', this.jwt.substring(0, 20));
+      console.log('  - JWT ends with:', this.jwt.substring(this.jwt.length - 20));
+      console.log('  - Serialized TX length:', serializedTransaction.length);
+      console.log('  - Serialized TX starts with:', serializedTransaction.substring(0, 20));
+
+      let executeResult;
+      try {
+        executeResult = await this.abilityClient.execute(
+          { serializedTransaction },
+          { delegatorPkpEthAddress: this.pkpAddress } // Use actual user's PKP address
+        );
+      } catch (error) {
+        console.error('❌ VincentSigner: Execute call failed with error:', error);
+        console.error('❌ VincentSigner: Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        });
+        throw error;
+      }
 
       console.log('🔍 VincentSigner: Execute result:', executeResult);
 

@@ -68,7 +68,7 @@ export const VaultLogs: React.FC<VaultLogsProps> = ({ vaultAddress }) => {
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-  // Fetch events from REST endpoint
+  // Fetch events from GraphQL endpoint with vault address filter
   const fetchEvents = useCallback(async () => {
     if (!vaultAddress) return;
 
@@ -76,12 +76,98 @@ export const VaultLogs: React.FC<VaultLogsProps> = ({ vaultAddress }) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/rest/user/vault/events');
+      // Use GraphQL with variables to fetch data for specific vault address
+      const query = `
+        query UserVaultEvents($vaultAddress: String!) {
+          UserVault_TokensReceived(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 100
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            amount
+            from
+            timestamp
+          }
+          UserVault_TokensWithdrawn(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 100
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            amount
+            to
+            timestamp
+          }
+          UserVault_TokenAdded(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 50
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            timestamp
+          }
+          UserVault_TokenRemoved(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 50
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            timestamp
+          }
+          UserVault_BalanceSynced(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 100
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            oldBalance
+            newBalance
+            timestamp
+          }
+          UserVault_AutoSyncTriggered(
+            where: { vaultAddress: { _eq: $vaultAddress } }
+            limit: 100
+            order_by: { timestamp: desc }
+          ) {
+            id
+            token
+            timestamp
+          }
+        }
+      `;
+
+      const variables = {
+        vaultAddress: vaultAddress,
+      };
+
+      const response = await fetch('http://localhost:8080/v1/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          variables,
+        }),
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: ApiResponse = await response.json();
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+      }
+
+      const data: ApiResponse = result.data;
 
       // Transform the data into a unified format
       const allEvents: VaultEvent[] = [

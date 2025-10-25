@@ -122,32 +122,56 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
     }
   }, []);
 
-  // Load vault tokens - show vault tokens in dropdown, user deposits from external wallet
+  // Load vault tokens - show common tokens for deposit, not just existing vault tokens
   const loadVaultBalances = useCallback(async () => {
     if (!vaultAddress) {
       console.log('🔍 No vaultAddress:', { vaultAddress });
       return;
     }
 
-    console.log('🔍 Loading vault tokens for dropdown');
+    console.log('🔍 Loading common tokens for deposit');
     setIsLoading(true);
     try {
-      // Get vault info using the same method as vault manager
-      const vaultInfo = await getVaultInfo(vaultAddress);
-      console.log('🔍 Vault info:', vaultInfo);
+      // Show common tokens that users can deposit, regardless of what's in the vault
+      const commonTokens: TokenBalance[] = [
+        {
+          address: '0x4200000000000000000000000000000000000006', // WETH
+          symbol: 'WETH',
+          balance: '0', // We'll show this as available for deposit
+          decimals: 18,
+        },
+        {
+          address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+          symbol: 'USDC',
+          balance: '0',
+          decimals: 6,
+        },
+        {
+          address: 'ETH', // Native ETH
+          symbol: 'ETH',
+          balance: '0',
+          decimals: 18,
+        },
+      ];
 
-      // Use vault balances directly - these are the tokens in your vault
-      const vaultTokenBalances: TokenBalance[] = vaultInfo.balances.map((vaultBalance) => ({
-        address: vaultBalance.address,
-        symbol: vaultBalance.symbol,
-        balance: ethers.utils.formatUnits(vaultBalance.balance, vaultBalance.decimals),
-        decimals: vaultBalance.decimals,
-        rawBalance: ethers.BigNumber.from(vaultBalance.balance),
-      }));
+      console.log('🔍 Common tokens for deposit:', commonTokens);
+      setUserBalances(commonTokens); // Show common tokens for deposit
 
-      console.log('🔍 Vault tokens for dropdown:', vaultTokenBalances);
-      setUserBalances(vaultTokenBalances); // Show vault tokens in dropdown
-      setVaultBalances(vaultTokenBalances); // Also store for reference
+      // Also try to get vault info for reference (optional)
+      try {
+        const vaultInfo = await getVaultInfo(vaultAddress);
+        const vaultTokenBalances: TokenBalance[] = vaultInfo.balances.map((vaultBalance) => ({
+          address: vaultBalance.address,
+          symbol: vaultBalance.symbol,
+          balance: ethers.utils.formatUnits(vaultBalance.balance, vaultBalance.decimals),
+          decimals: vaultBalance.decimals,
+          rawBalance: ethers.BigNumber.from(vaultBalance.balance),
+        }));
+        setVaultBalances(vaultTokenBalances);
+      } catch (vaultError) {
+        console.log('🔍 Could not load vault info (new vault?):', vaultError);
+        setVaultBalances([]);
+      }
     } catch (error) {
       console.error('❌ Error loading vault balances:', error);
       setError('Failed to load vault token balances');
@@ -393,15 +417,33 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
           }
         }
 
-        // Verify the approval worked
-        currentAllowance = await tokenContract.allowance(userAddress, vaultAddress);
-        console.log(
-          '📊 New allowance after approval:',
-          ethers.utils.formatUnits(currentAllowance, decimals)
-        );
+        // Verify the approval worked with retry mechanism
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (retryCount < maxRetries) {
+          // Wait a bit for the blockchain state to update
+          if (retryCount > 0) {
+            console.log(`⏳ Retrying allowance check (attempt ${retryCount + 1}/${maxRetries})...`);
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+
+          currentAllowance = await tokenContract.allowance(userAddress, vaultAddress);
+          console.log(
+            '📊 New allowance after approval:',
+            ethers.utils.formatUnits(currentAllowance, decimals)
+          );
+
+          if (currentAllowance.gte(amountWei)) {
+            console.log('✅ Approval verification successful!');
+            break;
+          }
+
+          retryCount++;
+        }
 
         if (currentAllowance.lt(amountWei)) {
-          console.error('❌ Approval failed!');
+          console.error('❌ Approval failed after retries!');
           console.error(
             '📊 Expected allowance:',
             ethers.utils.formatUnits(approveAmount, decimals)
@@ -535,7 +577,8 @@ export const DepositPopup: React.FC<DepositPopupProps> = ({ isOpen, onClose, vau
             Deposit to Vault
           </DialogTitle>
           <DialogDescription>
-            Select a token and amount to deposit into your vault
+            Select a token and amount to deposit into your vault. You can deposit WETH, USDC, and
+            other supported tokens.
           </DialogDescription>
         </DialogHeader>
 

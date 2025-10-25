@@ -27,6 +27,15 @@ export const TOKEN_METADATA = {
 
 // Helper function to get token info by address
 export const getTokenInfo = (address: string) => {
+  // Handle native ETH
+  if (address === 'ETH') {
+    return {
+      symbol: 'ETH',
+      name: 'Ethereum',
+      decimals: 18,
+    };
+  }
+
   return (
     TOKEN_METADATA[address as keyof typeof TOKEN_METADATA] || {
       symbol: 'UNK',

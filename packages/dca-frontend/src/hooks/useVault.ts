@@ -79,13 +79,21 @@ export const useVault = () => {
         env.VITE_DELEGATEE_PRIVATE_KEY?.substring(0, 10) + '...'
       );
       console.log('🔍 useVault: JWT available:', !!authInfo.jwt);
+      console.log('🔍 useVault: JWT length:', authInfo.jwt?.length);
       console.log('🔍 useVault: JWT (first 50 chars):', authInfo.jwt.substring(0, 50) + '...');
+      console.log(
+        '🔍 useVault: JWT (last 50 chars):',
+        '...' + authInfo.jwt.substring(authInfo.jwt.length - 50)
+      );
+      console.log('🔍 useVault: PKP Address:', authInfo.pkp.ethAddress);
+      console.log('🔍 useVault: PKP Address length:', authInfo.pkp.ethAddress?.length);
       console.log('🔍 useVault: Full authInfo:', {
         pkpEthAddress: authInfo.pkp.ethAddress,
         pkpPublicKey: authInfo.pkp.publicKey?.substring(0, 20) + '...',
         appId: authInfo.app.id,
         appVersion: authInfo.app.version,
         hasJWT: !!authInfo.jwt,
+        jwtLength: authInfo.jwt?.length,
       });
       console.log('🔍 ===================================');
 
@@ -341,6 +349,23 @@ export const useVault = () => {
           ];
           tokensToCheck = specificTokens;
 
+          // First, try to sync token balances to ensure they're up to date
+          console.log('🔄 Syncing vault token balances...');
+          try {
+            await Promise.all(
+              tokensToCheck.map(async (tokenAddress: string) => {
+                try {
+                  await vault.syncTokenBalance(tokenAddress);
+                  console.log(`✅ Synced balance for token: ${tokenAddress}`);
+                } catch (syncError) {
+                  console.warn(`⚠️ Failed to sync balance for token ${tokenAddress}:`, syncError);
+                }
+              })
+            );
+          } catch (syncError) {
+            console.warn('⚠️ Balance sync failed, continuing with current state:', syncError);
+          }
+
           // Get balances for each token individually using getBalance()
           balancesRaw = await Promise.all(
             tokensToCheck.map(async (tokenAddress: string) => {
@@ -365,13 +390,22 @@ export const useVault = () => {
               const erc20 = await getERC20Contract(tokenAddress);
               const [symbol, decimals] = await Promise.all([erc20.symbol(), erc20.decimals()]);
               const rawBalance = balancesRaw[index]?.toString() || '0';
+              const balanceFormatted = ethers.utils.formatUnits(rawBalance, decimals);
+
+              console.log(`🔍 Token ${symbol} (${tokenAddress}):`, {
+                rawBalance: rawBalance,
+                formattedBalance: balanceFormatted,
+                decimals: decimals,
+              });
+
               return {
                 address: tokenAddress,
                 symbol: symbol,
                 balance: rawBalance, // Keep raw balance in wei
                 decimals: decimals,
               };
-            } catch {
+            } catch (error) {
+              console.warn(`⚠️ Failed to get token info for ${tokenAddress}:`, error);
               return {
                 address: tokenAddress,
                 symbol: 'UNK',
@@ -382,11 +416,8 @@ export const useVault = () => {
           })
         );
 
-        // Filter out tokens with zero balance to avoid cluttering the UI
-        const nonZeroBalances = balances.filter((balance) => {
-          const balanceWei = ethers.BigNumber.from(balance.balance);
-          return balanceWei.gt(0);
-        });
+        // Show all tokens (including zero balances) for debugging
+        const nonZeroBalances = balances; // Don't filter out zero balances for now
 
         const result = {
           address: vaultAddress,

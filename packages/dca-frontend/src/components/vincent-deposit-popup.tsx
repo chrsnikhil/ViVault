@@ -177,20 +177,32 @@ export const VincentDepositPopup: React.FC<VincentDepositPopupProps> = ({ isOpen
         throw new Error('MetaMask not detected. Please install MetaMask.');
       }
 
+      console.log('🔍 MetaMask detected, requesting account access...');
+
       // Request account access
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const userAddress = accounts[0];
 
       console.log('👤 MetaMask account:', userAddress);
       console.log('🎯 Vincent wallet address:', authInfo.pkp.ethAddress);
+      console.log('🔍 Selected token:', selectedToken);
+      console.log('🔍 Amount:', amount);
 
       // Create provider and signer for MetaMask
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
 
+      // Check actual balance
+      const balance = await provider.getBalance(userAddress);
+      console.log('💰 MetaMask ETH balance (wei):', balance.toString());
+      console.log('💰 MetaMask ETH balance (ETH):', ethers.utils.formatEther(balance));
+
       if (selectedToken === 'ETH') {
         // Handle native ETH transfer
         console.log('💰 Sending native ETH...');
+        console.log('🔍 Amount to send:', amount);
+        console.log('🔍 Amount in wei:', ethers.utils.parseEther(amount).toString());
+        console.log('🔍 Vincent address:', authInfo.pkp.ethAddress);
         setStep('deposit');
 
         const tx = await signer.sendTransaction({
@@ -234,7 +246,33 @@ export const VincentDepositPopup: React.FC<VincentDepositPopupProps> = ({ isOpen
       }
     } catch (err: unknown) {
       console.error('❌ Deposit failed:', err);
-      setError(err instanceof Error ? err.message : 'Deposit failed');
+      console.error('❌ Error type:', typeof err);
+      console.error('❌ Error message:', err instanceof Error ? err.message : 'Unknown error');
+      console.error('❌ Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('❌ Full error object:', JSON.stringify(err, null, 2));
+
+      let errorMessage = 'Deposit failed';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+
+      // Handle specific JSON-RPC errors
+      if (err && typeof err === 'object' && 'code' in err && err.code === -32603) {
+        const data = (err as { data?: { message?: string } }).data;
+        if (data && data.message && data.message.includes('insufficient funds')) {
+          errorMessage = `Insufficient funds: ${data.message}`;
+        } else if (data && data.message && data.message.includes('missing trie node')) {
+          errorMessage = `Network error: ${data.message}. Please try again in a few moments.`;
+        } else if (data && data.message) {
+          errorMessage = `Transaction failed: ${data.message}`;
+        }
+      }
+
+      setError(errorMessage);
       setStep('select'); // Go back to select step on error
     } finally {
       setIsDepositing(false);

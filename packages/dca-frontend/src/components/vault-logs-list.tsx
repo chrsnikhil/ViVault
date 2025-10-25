@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TransactionDetailsPopup } from '@/components/transaction-details-popup';
+import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 
 interface VaultEvent {
   id: string;
@@ -36,7 +37,14 @@ interface VaultEvent {
   oldBalance?: string;
   newBalance?: string;
   timestamp: string;
-  type: 'deposit' | 'withdrawal' | 'token_added' | 'token_removed' | 'balance_synced' | 'auto_sync';
+  type:
+    | 'deposit'
+    | 'withdrawal'
+    | 'token_added'
+    | 'token_removed'
+    | 'balance_synced'
+    | 'auto_sync'
+    | 'ownership_transferred';
 }
 
 interface ApiEvent {
@@ -57,14 +65,15 @@ interface ApiResponse {
   UserVault_TokenRemoved?: ApiEvent[];
   UserVault_BalanceSynced?: ApiEvent[];
   UserVault_AutoSyncTriggered?: ApiEvent[];
+  UserVault_OwnershipTransferred?: ApiEvent[];
 }
 
 interface VaultLogsListProps {
-  vaultAddress: string | null;
   onClose?: () => void;
 }
 
-export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onClose }) => {
+export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
+  const { authInfo } = useJwtContext();
   const [events, setEvents] = useState<VaultEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,18 +110,33 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
 
   // Fetch events from REST endpoint
   const fetchEvents = useCallback(async () => {
-    if (!vaultAddress) return;
+    if (!authInfo?.pkp.ethAddress) {
+      console.log('🔍 No user address available for fetching events');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/rest/user/vault/events');
+      console.log('🔍 Fetching events for user:', authInfo.pkp.ethAddress);
+
+      const response = await fetch('http://localhost:8080/api/rest/vault/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userAddress: authInfo.pkp.ethAddress,
+        }),
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data: ApiResponse = await response.json();
+      console.log('🔍 Received events data:', data);
 
       // Transform the data into a unified format
       const allEvents: VaultEvent[] = [
@@ -158,6 +182,14 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
           timestamp: event.timestamp,
           type: 'auto_sync' as const,
         })),
+        ...(data.UserVault_OwnershipTransferred || []).map((event: ApiEvent) => ({
+          id: event.id,
+          token: event.token,
+          from: event.from,
+          to: event.to,
+          timestamp: event.timestamp,
+          type: 'ownership_transferred' as const,
+        })),
       ];
 
       // Sort events
@@ -167,6 +199,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
         return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
       });
 
+      console.log('🔍 Processed events:', sortedEvents.length);
       setEvents(sortedEvents);
     } catch (err) {
       console.error('Error fetching vault events:', err);
@@ -174,7 +207,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
     } finally {
       setLoading(false);
     }
-  }, [vaultAddress, sortOrder]);
+  }, [authInfo?.pkp.ethAddress, sortOrder]);
 
   useEffect(() => {
     fetchEvents();
@@ -207,6 +240,8 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
         return <RotateCcw className="size-4 text-purple-500" />;
       case 'auto_sync':
         return <Zap className="size-4 text-yellow-500" />;
+      case 'ownership_transferred':
+        return <RefreshCw className="size-4 text-indigo-500" />;
       default:
         return <Clock className="size-4 text-muted-foreground" />;
     }
@@ -226,16 +261,20 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
         return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20 dark:text-purple-300 dark:border-purple-800';
       case 'auto_sync':
         return 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-800';
+      case 'ownership_transferred':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-800';
       default:
         return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-950/20 dark:text-gray-300 dark:border-gray-800';
     }
   };
 
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string | undefined) => {
+    if (!address) return 'N/A';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatAmount = (amount: string, decimals: number = 18) => {
+  const formatAmount = (amount: string | undefined, decimals: number = 18) => {
+    if (!amount) return '0';
     try {
       const num = parseFloat(amount) / Math.pow(10, decimals);
       return num.toFixed(6);
@@ -244,7 +283,8 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: string | undefined) => {
+    if (!timestamp) return 'N/A';
     try {
       let date: Date;
       if (typeof timestamp === 'string') {
@@ -355,6 +395,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ vaultAddress, onCl
                 <SelectItem value="token_removed">Token Removed</SelectItem>
                 <SelectItem value="balance_synced">Balance Synced</SelectItem>
                 <SelectItem value="auto_sync">Auto Sync</SelectItem>
+                <SelectItem value="ownership_transferred">Ownership Transferred</SelectItem>
               </SelectContent>
             </Select>
             <Select
