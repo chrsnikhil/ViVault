@@ -12,9 +12,9 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as Theme) || 'orange-black';
+      return (localStorage.getItem('theme') as Theme) || 'black-orange';
     }
-    return 'orange-black';
+    return 'black-orange';
   });
 
   useEffect(() => {

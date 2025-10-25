@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet,
   Plus,
@@ -36,6 +37,7 @@ import { DepositPopup } from '@/components/deposit-popup';
 import { VolatilityIndexCard } from '@/components/volatility-index-card';
 import { RebalancingPanel } from '@/components/rebalancing-panel';
 import { AutomationPanel } from '@/components/automation-panel';
+import { VaultLogsList } from '@/components/vault-logs-list';
 import {
   Dialog,
   DialogContent,
@@ -64,6 +66,46 @@ export const VaultManager: React.FC = () => {
   const [showAllTokens, setShowAllTokens] = useState(false);
   const [tokenListPopupOpen, setTokenListPopupOpen] = useState(false);
   const [tokenSearchQuery, setTokenSearchQuery] = useState('');
+  const [logsSidebarOpen, setLogsSidebarOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Sidebar animation variants
+  const sidebarVariants = {
+    hidden: { x: '-100%', opacity: 0 },
+    visible: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring' as const,
+        stiffness: 300,
+        damping: 30,
+        duration: 0.4,
+      },
+    },
+    exit: {
+      x: '-100%',
+      opacity: 0,
+      transition: {
+        type: 'spring' as const,
+        stiffness: 400,
+        damping: 40,
+        duration: 0.3,
+      },
+    },
+  };
+
+  const backdropVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { duration: 0.2 },
+    },
+    exit: {
+      opacity: 0,
+      transition: { duration: 0.2 },
+    },
+  };
 
   // Local price calculator and computed vault value
   const [priceCalculator] = useState(() => new PriceCalculator());
@@ -107,6 +149,42 @@ export const VaultManager: React.FC = () => {
 
     loadVaultAddress();
   }, [authInfo?.pkp.ethAddress, getVaultAddress]);
+
+  // Handle sidebar resize
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const newWidth = e.clientX;
+      const minWidth = 300;
+      const maxWidth = 600;
+
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setSidebarWidth(newWidth);
+      }
+    },
+    [isResizing]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   // Load vault info when vault address changes
   const loadVaultInfo = useCallback(async () => {
@@ -525,19 +603,31 @@ export const VaultManager: React.FC = () => {
                     </Badge>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refreshVaultStatusFull}
-                  disabled={loading}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="size-4" />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLogsSidebarOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <List className="size-4" />
+                    Activity Logs
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshVaultStatusFull}
+                    disabled={loading}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className="size-4" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </div>
 
+            {/* Main Content */}
             <div className="space-y-8">
               {/* Vault Overview */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1165,6 +1255,44 @@ export const VaultManager: React.FC = () => {
           loadVaultInfo();
         }}
       />
+
+      {/* Custom Logs Sidebar */}
+      <AnimatePresence>
+        {logsSidebarOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setLogsSidebarOpen(false)}
+              variants={backdropVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            />
+
+            {/* Sidebar */}
+            <motion.div
+              className="fixed top-0 left-0 h-full bg-background border-r shadow-lg z-50 flex flex-col"
+              style={{ width: `${sidebarWidth}px` }}
+              variants={sidebarVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <VaultLogsList
+                vaultAddress={vaultAddress}
+                onClose={() => setLogsSidebarOpen(false)}
+              />
+
+              {/* Resize Handle */}
+              <div
+                className="absolute top-0 right-0 w-1 h-full bg-border hover:bg-primary/50 cursor-col-resize transition-colors"
+                onMouseDown={handleMouseDown}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

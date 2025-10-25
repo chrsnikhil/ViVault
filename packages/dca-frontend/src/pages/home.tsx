@@ -5,20 +5,12 @@ import { Card, CardTitle, CardDescription, CardContent } from '@/components/ui/c
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
-import ComponentGallery from '@/components/component-gallery';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { PriceFeedPage } from '@/pages/price-feed';
-import {
-  Menu,
-  X,
-  ArrowRight,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  WalletIcon,
-  TrendingUp,
-} from 'lucide-react';
+import { VolatilityChart } from '@/components/volatility-chart';
+import RebalancingFlowDiagram from '@/components/rebalancing-flow-diagram';
+import { Menu, X, ArrowRight, CheckCircle, DollarSign, WalletIcon, TrendingUp } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -259,36 +251,35 @@ export const Home: React.FC = () => {
 
         {/* Benefits */}
         <section className="mx-auto max-w-7xl px-6 pb-16">
+          <motion.div className="text-center mb-12" variants={fadeInUp}>
+            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">The Why</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Discover the core principles that drive our innovative approach to DeFi vault
+              management.
+            </p>
+          </motion.div>
+
+          {/* Market Volatility Chart */}
+          <motion.div className="mb-16 flex justify-center" variants={fadeInUp}>
+            <VolatilityChart />
+          </motion.div>
+        </section>
+
+        {/* Benefits */}
+        <section className="mx-auto max-w-7xl px-6 pb-16">
           <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={stagger}>
             <motion.div variants={fadeInUp}>
               <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="px-6 py-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
-                      <DollarSign className="size-5 text-primary" />
+                      <TrendingUp className="size-5 text-primary" />
                     </div>
-                    <CardTitle className="text-lg">Transparent rates</CardTitle>
+                    <CardTitle className="text-lg">Smart Automation</CardTitle>
                   </div>
-                  <CardDescription className="mb-3">No hidden fees, ever.</CardDescription>
+                  <CardDescription className="mb-3">Automated rebalancing</CardDescription>
                   <p className="text-muted-foreground leading-relaxed">
-                    Clear pricing with upfront terms so you always know what you'll pay.
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={fadeInUp}>
-              <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="px-6 py-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
-                      <Clock className="size-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg">Lightning approvals</CardTitle>
-                  </div>
-                  <CardDescription className="mb-3">Decisions in minutes</CardDescription>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Simple application and fast verification to get you funded sooner.
+                    Automated portfolio management that adapts to market volatility in real-time.
                   </p>
                 </CardContent>
               </Card>
@@ -301,11 +292,30 @@ export const Home: React.FC = () => {
                     <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
                       <CheckCircle className="size-5 text-primary" />
                     </div>
-                    <CardTitle className="text-lg">Flexible repayments</CardTitle>
+                    <CardTitle className="text-lg">Secure & Transparent</CardTitle>
                   </div>
-                  <CardDescription className="mb-3">Match your cash flow</CardDescription>
+                  <CardDescription className="mb-3">On-chain execution</CardDescription>
                   <p className="text-muted-foreground leading-relaxed">
-                    Choose a repayment schedule that works for your business seasonality.
+                    All transactions are executed on-chain with full transparency and security using
+                    Vincent automation.
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={fadeInUp}>
+              <Card className="h-full border shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="px-6 py-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center">
+                      <DollarSign className="size-5 text-primary" />
+                    </div>
+                    <CardTitle className="text-lg">Volatility Index</CardTitle>
+                  </div>
+                  <CardDescription className="mb-3">Calculated every 10 minutes</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Real-time volatility tracking ensures accurate market assessment and optimal
+                    rebalancing decisions.
                   </p>
                 </CardContent>
               </Card>
@@ -320,7 +330,7 @@ export const Home: React.FC = () => {
               How it works
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Three simple steps to get the funding you need for your business.
+              Three simple steps to automated DeFi vault management.
             </p>
           </motion.div>
 
@@ -335,19 +345,13 @@ export const Home: React.FC = () => {
                     >
                       1
                     </Badge>
-                    <CardTitle className="text-lg">Apply</CardTitle>
+                    <CardTitle className="text-lg">Monitor Volatility</CardTitle>
                   </div>
-                  <CardDescription className="mb-3">5-minute form</CardDescription>
-                  <p className="text-muted-foreground leading-relaxed mb-4">
-                    Tell us about your business and funding needs—no jargon, no hassles.
+                  <CardDescription className="mb-3">Real-time tracking</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Our volatility index calculates market conditions every 10 minutes to identify
+                    rebalancing opportunities.
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-input hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  >
-                    Start application
-                  </Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -362,19 +366,13 @@ export const Home: React.FC = () => {
                     >
                       2
                     </Badge>
-                    <CardTitle className="text-lg">Get approved</CardTitle>
+                    <CardTitle className="text-lg">Auto Rebalance</CardTitle>
                   </div>
-                  <CardDescription className="mb-3">Quick decision</CardDescription>
-                  <p className="text-muted-foreground leading-relaxed mb-4">
-                    We review your information and provide an offer with clear terms.
+                  <CardDescription className="mb-3">Smart execution</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    When volatility thresholds are met, the system automatically rebalances your
+                    portfolio for optimal performance.
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-input hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  >
-                    View sample terms
-                  </Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -389,36 +387,136 @@ export const Home: React.FC = () => {
                     >
                       3
                     </Badge>
-                    <CardTitle className="text-lg">Receive funds</CardTitle>
+                    <CardTitle className="text-lg">Vincent Automation</CardTitle>
                   </div>
-                  <CardDescription className="mb-3">Fast transfer</CardDescription>
-                  <p className="text-muted-foreground leading-relaxed mb-4">
-                    Accept the offer and get funds to your account—usually same day.
+                  <CardDescription className="mb-3">Seamless execution</CardDescription>
+                  <p className="text-muted-foreground leading-relaxed">
+                    All transactions are executed on-chain using Vincent's automation capabilities
+                    for maximum security and transparency.
                   </p>
-                  <Button
-                    size="sm"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  >
-                    Apply now
-                  </Button>
                 </CardContent>
               </Card>
             </motion.div>
           </motion.div>
         </section>
 
-        {/* Component Gallery */}
-        <section className="mx-auto max-w-7xl px-6 pb-20">
-          <motion.div className="mb-8" variants={fadeInUp}>
+        {/* Volatility Index Calculation */}
+        <section className="mx-auto max-w-7xl px-6 pb-16">
+          <motion.div className="text-center mb-12" variants={fadeInUp}>
             <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
-              Explore the experience
+              How We Calculate Volatility
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              Try a quick calculator, start an application, and see customer stories.
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Our volatility index uses mathematical precision to measure market movements every 10
+              minutes.
             </p>
           </motion.div>
-          <motion.div variants={fadeInUp}>
-            <ComponentGallery />
+
+          <motion.div className="max-w-4xl mx-auto" variants={fadeInUp}>
+            <Card className="border shadow-sm">
+              <CardContent className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left side - Formula */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground mb-4">
+                      Mathematical Formula
+                    </h3>
+                    <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                      <div className="text-sm font-mono text-foreground space-y-2">
+                        <div>
+                          1. <span className="text-primary">Collect</span> 12 weeks of prices
+                        </div>
+                        <div>
+                          2. <span className="text-primary">Calculate</span> weekly returns
+                        </div>
+                        <div>
+                          3. <span className="text-primary">Find</span> average return
+                        </div>
+                        <div>
+                          4. <span className="text-primary">Measure</span> standard deviation
+                        </div>
+                        <div>
+                          5. <span className="text-primary">Convert</span> to basis points
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <strong>Formula:</strong> Volatility = √(Σ(Return - Average)² ÷ (n-1)) ×
+                      10,000
+                    </div>
+                  </div>
+
+                  {/* Right side - Example */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground mb-4">Real Example</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Week 1:</span>
+                        <span className="font-mono">$3,200 → $3,150</span>
+                        <span className="text-red-500">-1.56%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Week 2:</span>
+                        <span className="font-mono">$3,150 → $3,300</span>
+                        <span className="text-green-500">+4.76%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Week 3:</span>
+                        <span className="font-mono">$3,300 → $3,100</span>
+                        <span className="text-red-500">-6.06%</span>
+                      </div>
+                      <div className="border-t pt-2 mt-4">
+                        <div className="flex justify-between font-semibold">
+                          <span>Volatility:</span>
+                          <span className="text-primary">320 basis points</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          High volatility → Trigger rebalancing
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-primary mb-2">10 min</div>
+                      <div className="text-sm text-muted-foreground">Update frequency</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-primary mb-2">12 weeks</div>
+                      <div className="text-sm text-muted-foreground">Historical data</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-primary mb-2">Pyth Oracle</div>
+                      <div className="text-sm text-muted-foreground">Data source</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </section>
+
+        {/* Rebalancing Flow Diagram */}
+        <section className="mx-auto max-w-7xl px-6 pb-16">
+          <motion.div className="text-center mb-12" variants={fadeInUp}>
+            <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
+              How Rebalancing Works
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Drag the steps around to explore our automated rebalancing process. They'll snap back
+              to form a perfect circle.
+            </p>
+          </motion.div>
+
+          <motion.div className="max-w-4xl mx-auto" variants={fadeInUp}>
+            <Card className="border shadow-sm">
+              <CardContent className="p-8">
+                <RebalancingFlowDiagram />
+              </CardContent>
+            </Card>
           </motion.div>
         </section>
 
@@ -429,31 +527,8 @@ export const Home: React.FC = () => {
             variants={fadeInUp}
           >
             <p className="text-muted-foreground text-sm">
-              © {new Date().getFullYear()} ViVault. All rights reserved.
+              {new Date().getFullYear()} ViVault. Built for ETHOnline 2025.
             </p>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Privacy
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Terms
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Support
-              </Button>
-            </div>
           </motion.div>
         </footer>
       </motion.div>

@@ -4,7 +4,85 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Core color tokens (OKLCH) - Orange-Black Theme with Black Text */
+  /* Core color tokens (OKLCH) - Black-Orange Theme (Default) */
+  --background: oklch(0.1 0.01 0);
+  --foreground: oklch(0.95 0.01 0);
+  --card: oklch(0.15 0.01 0);
+  --card-foreground: oklch(0.95 0.01 0);
+  --popover: oklch(0.15 0.01 0);
+  --popover-foreground: oklch(0.95 0.01 0);
+  --primary: oklch(0.5 0.15 35);
+  --primary-foreground: oklch(0.95 0.01 0);
+  --secondary: oklch(0.25 0.01 0);
+  --secondary-foreground: oklch(0.95 0.01 0);
+  --muted: oklch(0.2 0.01 0);
+  --muted-foreground: oklch(0.7 0.01 0);
+  --accent: oklch(0.45 0.1 35);
+  --accent-foreground: oklch(0.95 0.01 0);
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.95 0.01 0);
+  --border: oklch(0.3 0.01 0);
+  --input: oklch(0.2 0.01 0);
+  --ring: oklch(0.5 0.15 35);
+  
+  /* Charts for black-orange theme */
+  --chart-1: oklch(0.1 0.01 0);
+  --chart-2: oklch(0.2 0.01 0);
+  --chart-3: oklch(0.3 0.01 0);
+  --chart-4: oklch(0.4 0.01 0);
+  --chart-5: oklch(0.5 0.01 0);
+  
+  /* Sidebar for black-orange theme */
+  --sidebar: oklch(0.1 0.01 0);
+  --sidebar-foreground: oklch(0.95 0.01 0);
+  --sidebar-primary: oklch(0.5 0.15 35);
+  --sidebar-primary-foreground: oklch(0.95 0.01 0);
+  --sidebar-accent: oklch(0.25 0.01 0);
+  --sidebar-accent-foreground: oklch(0.95 0.01 0);
+  --sidebar-border: oklch(0.3 0.01 0);
+  --sidebar-ring: oklch(0.5 0.15 35);
+  
+  /* Radius and Typography tokens */
+  --radius: 0.75rem;
+  --font-sans: 'Geist Mono', monospace;
+  --font-mono: 'Geist Mono', monospace;
+  
+  /* Shadows - 3D Propped Up Effect with Matte Orange */
+  --shadow-2xs: 2px 2px 0px 0px rgba(200, 100, 0, 0.6), 4px 4px 8px 0px rgba(200, 100, 0, 0.2);
+  --shadow-xs: 3px 3px 0px 0px rgba(200, 100, 0, 0.6), 6px 6px 12px 0px rgba(200, 100, 0, 0.2);
+  --shadow-sm: 4px 4px 0px 0px rgba(200, 100, 0, 0.6), 8px 8px 16px 0px rgba(200, 100, 0, 0.2);
+  --shadow: 4px 4px 0px 0px rgba(200, 100, 0, 0.6), 8px 8px 16px 0px rgba(200, 100, 0, 0.2);
+  --shadow-md: 6px 6px 0px 0px rgba(200, 100, 0, 0.6), 12px 12px 24px 0px rgba(200, 100, 0, 0.2);
+  --shadow-lg: 8px 8px 0px 0px rgba(200, 100, 0, 0.6), 16px 16px 32px 0px rgba(200, 100, 0, 0.2);
+  --shadow-xl: 10px 10px 0px 0px rgba(200, 100, 0, 0.6), 20px 20px 40px 0px rgba(200, 100, 0, 0.2);
+  --shadow-2xl: 12px 12px 0px 0px rgba(200, 100, 0, 0.6), 24px 24px 48px 0px rgba(200, 100, 0, 0.2);
+}
+
+.dark {
+  /* Dark mode variant - same as light mode for black-orange theme */
+  --background: oklch(0.1 0.01 0);
+  --foreground: oklch(0.95 0.01 0);
+  --card: oklch(0.15 0.01 0);
+  --card-foreground: oklch(0.95 0.01 0);
+  --popover: oklch(0.15 0.01 0);
+  --popover-foreground: oklch(0.95 0.01 0);
+  --primary: oklch(0.5 0.15 35);
+  --primary-foreground: oklch(0.95 0.01 0);
+  --secondary: oklch(0.25 0.01 0);
+  --secondary-foreground: oklch(0.95 0.01 0);
+  --muted: oklch(0.2 0.01 0);
+  --muted-foreground: oklch(0.7 0.01 0);
+  --accent: oklch(0.45 0.1 35);
+  --accent-foreground: oklch(0.95 0.01 0);
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.95 0.01 0);
+  --border: oklch(0.3 0.01 0);
+  --input: oklch(0.2 0.01 0);
+  --ring: oklch(0.5 0.15 35);
+}
+
+/* Orange-Black Theme (Alternative) */
+[data-theme="orange-black"] {
   --background: oklch(0.55 0.18 45);
   --foreground: oklch(0.1 0.01 0);
   --card: oklch(0.6 0.15 45);
@@ -42,12 +120,7 @@
   --sidebar-border: oklch(0.1 0.01 0);
   --sidebar-ring: oklch(0.1 0.01 0);
   
-  /* Radius and Typography tokens */
-  --radius: 0.75rem;
-  --font-sans: 'Geist Mono', monospace;
-  --font-mono: 'Geist Mono', monospace;
-  
-  /* Shadows - 3D Propped Up Effect with Full Black (Orange-Black Theme) */
+  /* Shadows - 3D Propped Up Effect with Full Black */
   --shadow-2xs: 2px 2px 0px 0px rgba(0, 0, 0, 0.8), 4px 4px 8px 0px rgba(0, 0, 0, 0.3);
   --shadow-xs: 3px 3px 0px 0px rgba(0, 0, 0, 0.8), 6px 6px 12px 0px rgba(0, 0, 0, 0.3);
   --shadow-sm: 4px 4px 0px 0px rgba(0, 0, 0, 0.8), 8px 8px 16px 0px rgba(0, 0, 0, 0.3);
@@ -56,79 +129,6 @@
   --shadow-lg: 8px 8px 0px 0px rgba(0, 0, 0, 0.8), 16px 16px 32px 0px rgba(0, 0, 0, 0.3);
   --shadow-xl: 10px 10px 0px 0px rgba(0, 0, 0, 0.8), 20px 20px 40px 0px rgba(0, 0, 0, 0.3);
   --shadow-2xl: 12px 12px 0px 0px rgba(0, 0, 0, 0.8), 24px 24px 48px 0px rgba(0, 0, 0, 0.3);
-}
-
-.dark {
-  /* Dark mode variant - same as light mode for orange-black theme with black text */
-  --background: oklch(0.55 0.18 45);
-  --foreground: oklch(0.1 0.01 0);
-  --card: oklch(0.6 0.15 45);
-  --card-foreground: oklch(0.1 0.01 0);
-  --popover: oklch(0.6 0.15 45);
-  --popover-foreground: oklch(0.1 0.01 0);
-  --primary: oklch(0.1 0.01 0);
-  --primary-foreground: oklch(0.95 0.01 0);
-  --secondary: oklch(0.7 0.2 45);
-  --secondary-foreground: oklch(0.1 0.01 0);
-  --muted: oklch(0.45 0.15 45);
-  --muted-foreground: oklch(0.3 0.01 0);
-  --accent: oklch(0.65 0.12 45);
-  --accent-foreground: oklch(0.1 0.01 0);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.95 0.01 0);
-  --border: oklch(0.1 0.01 0);
-  --input: oklch(0.5 0.15 45);
-  --ring: oklch(0.1 0.01 0);
-}
-
-/* Black-Orange Theme (Alternative) */
-[data-theme="black-orange"] {
-  --background: oklch(0.1 0.01 0);
-  --foreground: oklch(0.95 0.01 0);
-  --card: oklch(0.15 0.01 0);
-  --card-foreground: oklch(0.95 0.01 0);
-  --popover: oklch(0.15 0.01 0);
-  --popover-foreground: oklch(0.95 0.01 0);
-  --primary: oklch(0.7 0.2 45);
-  --primary-foreground: oklch(0.1 0.01 0);
-  --secondary: oklch(0.25 0.01 0);
-  --secondary-foreground: oklch(0.95 0.01 0);
-  --muted: oklch(0.2 0.01 0);
-  --muted-foreground: oklch(0.7 0.01 0);
-  --accent: oklch(0.65 0.12 45);
-  --accent-foreground: oklch(0.1 0.01 0);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.95 0.01 0);
-  --border: oklch(0.3 0.01 0);
-  --input: oklch(0.2 0.01 0);
-  --ring: oklch(0.7 0.2 45);
-  
-  /* Charts for black-orange theme */
-  --chart-1: oklch(0.1 0.01 0);
-  --chart-2: oklch(0.2 0.01 0);
-  --chart-3: oklch(0.3 0.01 0);
-  --chart-4: oklch(0.4 0.01 0);
-  --chart-5: oklch(0.5 0.01 0);
-  
-  /* Sidebar for black-orange theme */
-  --sidebar: oklch(0.1 0.01 0);
-  --sidebar-foreground: oklch(0.95 0.01 0);
-  --sidebar-primary: oklch(0.7 0.2 45);
-  --sidebar-primary-foreground: oklch(0.1 0.01 0);
-  --sidebar-accent: oklch(0.25 0.01 0);
-  --sidebar-accent-foreground: oklch(0.95 0.01 0);
-  --sidebar-border: oklch(0.3 0.01 0);
-  --sidebar-ring: oklch(0.7 0.2 45);
-  
-  /* Shadows - 3D Propped Up Effect with Full Orange */
-  --shadow-2xs: 2px 2px 0px 0px rgba(255, 140, 0, 0.8), 4px 4px 8px 0px rgba(255, 140, 0, 0.3);
-  --shadow-xs: 3px 3px 0px 0px rgba(255, 140, 0, 0.8), 6px 6px 12px 0px rgba(255, 140, 0, 0.3);
-  --shadow-sm: 4px 4px 0px 0px rgba(255, 140, 0, 0.8), 8px 8px 16px 0px rgba(255, 140, 0, 0.3);
-  --shadow: 4px 4px 0px 0px rgba(255, 140, 0, 0.8), 8px 8px 16px 0px rgba(255, 140, 0, 0.3);
-  --shadow-md: 6px 6px 0px 0px rgba(255, 140, 0, 0.8), 12px 12px 24px 0px rgba(255, 140, 0, 0.3);
-  --shadow-lg: 8px 8px 0px 0px rgba(255, 140, 0, 0.8), 16px 16px 32px 0px rgba(255, 140, 0, 0.3);
-  --shadow-xl: 10px 10px 0px 0px rgba(255, 140, 0, 0.8), 20px 20px 40px 0px rgba(255, 140, 0, 0.3);
-  --shadow-2xl: 12px 12px 0px 0px rgba(255, 140, 0, 0.8), 24px 24px 48px 0px rgba(255, 140, 0, 0.3);
 }
 
 @theme inline {
@@ -323,4 +323,38 @@
       linear-gradient(rgba(255, 140, 0, 0.2) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 140, 0, 0.2) 1px, transparent 1px);
   }
+}
+
+/* Custom Scrollbar Styles */
+.scrollbar-hide {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Custom scrollbar for better aesthetics */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 140, 0, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 140, 0, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 140, 0, 0.5);
 }
