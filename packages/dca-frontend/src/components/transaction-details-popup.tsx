@@ -2,6 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowUpDown,
   ArrowDownUp,
@@ -38,6 +39,46 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
   transaction,
 }) => {
   if (!transaction) return null;
+
+  // Animation variants
+  const contentVariants = {
+    hidden: {
+      opacity: 0,
+      scale: 0.95,
+      y: 20,
+    },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 300,
+        damping: 30,
+        duration: 0.3,
+      },
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.95,
+      y: 20,
+      transition: {
+        duration: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.2,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      },
+    },
+  };
 
   const getEventIcon = (type: VaultEvent['type']) => {
     switch (type) {
@@ -136,170 +177,209 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            {getEventIcon(transaction.type)}
-            <span>{getTransactionTitle(transaction.type)}</span>
-            <Badge className={`ml-auto ${getEventColor(transaction.type)}`}>
-              {transaction.type.replace('_', ' ').toUpperCase()}
-            </Badge>
-          </DialogTitle>
-        </DialogHeader>
+    <AnimatePresence>
+      {isOpen && (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+          <DialogContent className="max-w-2xl" showCloseButton={false}>
+            <motion.div variants={contentVariants} initial="hidden" animate="visible" exit="exit">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  {getEventIcon(transaction.type)}
+                  <span>{getTransactionTitle(transaction.type)}</span>
+                  <Badge className={`ml-auto ${getEventColor(transaction.type)}`}>
+                    {transaction.type.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                </DialogTitle>
+              </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Transaction ID */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Transaction ID</label>
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <code className="flex-1 font-mono text-sm">{transaction.id}</code>
-              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(transaction.id)}>
-                <Copy className="size-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Timestamp */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Timestamp</label>
-            <div className="p-3 bg-muted rounded-lg">
-              <span className="text-sm">{formatTimestamp(transaction.timestamp)}</span>
-            </div>
-          </div>
-
-          {/* Token Address */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Token Contract</label>
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <code className="flex-1 font-mono text-sm">{transaction.token}</code>
-              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(transaction.token)}>
-                <Copy className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  window.open(`https://sepolia.basescan.org/address/${transaction.token}`, '_blank')
-                }
+              <motion.div
+                className="space-y-6"
+                variants={itemVariants}
+                initial="hidden"
+                animate="visible"
+                transition={{ staggerChildren: 0.1 }}
               >
-                <ExternalLink className="size-4" />
-              </Button>
-            </div>
-          </div>
+                {/* Transaction ID */}
+                <motion.div className="space-y-2" variants={itemVariants}>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Transaction ID
+                  </label>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <code className="flex-1 font-mono text-sm">{transaction.id}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(transaction.id)}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </motion.div>
 
-          {/* Amount */}
-          {transaction.amount && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Amount</label>
-              <div className="p-3 bg-muted rounded-lg">
-                <span className="text-lg font-mono">{formatAmount(transaction.amount)}</span>
-              </div>
-            </div>
-          )}
+                {/* Timestamp */}
+                <motion.div className="space-y-2" variants={itemVariants}>
+                  <label className="text-sm font-medium text-muted-foreground">Timestamp</label>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <span className="text-sm">{formatTimestamp(transaction.timestamp)}</span>
+                  </div>
+                </motion.div>
 
-          {/* From Address */}
-          {transaction.from && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">From Address</label>
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <code className="flex-1 font-mono text-sm">{transaction.from}</code>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(transaction.from!)}
-                >
-                  <Copy className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    window.open(
-                      `https://sepolia.basescan.org/address/${transaction.from}`,
-                      '_blank'
-                    )
-                  }
-                >
-                  <ExternalLink className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+                {/* Token Address */}
+                <motion.div className="space-y-2" variants={itemVariants}>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Token Contract
+                  </label>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <code className="flex-1 font-mono text-sm">{transaction.token}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(transaction.token)}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        window.open(
+                          `https://sepolia.basescan.org/address/${transaction.token}`,
+                          '_blank'
+                        )
+                      }
+                    >
+                      <ExternalLink className="size-4" />
+                    </Button>
+                  </div>
+                </motion.div>
 
-          {/* To Address */}
-          {transaction.to && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">To Address</label>
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <code className="flex-1 font-mono text-sm">{transaction.to}</code>
-                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(transaction.to!)}>
-                  <Copy className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    window.open(`https://sepolia.basescan.org/address/${transaction.to}`, '_blank')
-                  }
-                >
-                  <ExternalLink className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+                {/* Amount */}
+                {transaction.amount && (
+                  <motion.div className="space-y-2" variants={itemVariants}>
+                    <label className="text-sm font-medium text-muted-foreground">Amount</label>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <span className="text-lg font-mono">{formatAmount(transaction.amount)}</span>
+                    </div>
+                  </motion.div>
+                )}
 
-          {/* Balance Changes */}
-          {transaction.oldBalance && transaction.newBalance && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Balance Changes</label>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Previous Balance</span>
-                  <span className="font-mono">{formatAmount(transaction.oldBalance)}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">New Balance</span>
-                  <span className="font-mono">{formatAmount(transaction.newBalance)}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
-                  <span className="text-sm font-medium">Difference</span>
-                  <span className="font-mono text-primary">
-                    {formatAmount(
-                      (
-                        parseFloat(transaction.newBalance) - parseFloat(transaction.oldBalance)
-                      ).toString()
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+                {/* From Address */}
+                {transaction.from && (
+                  <motion.div className="space-y-2" variants={itemVariants}>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      From Address
+                    </label>
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <code className="flex-1 font-mono text-sm">{transaction.from}</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(transaction.from!)}
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(
+                            `https://sepolia.basescan.org/address/${transaction.from}`,
+                            '_blank'
+                          )
+                        }
+                      >
+                        <ExternalLink className="size-4" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
 
-          {/* Event Summary */}
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-medium mb-2">Event Summary</h4>
-            <p className="text-sm text-muted-foreground">
-              {transaction.type === 'deposit' &&
-                'Tokens were deposited into the vault from an external address.'}
-              {transaction.type === 'withdrawal' &&
-                'Tokens were withdrawn from the vault to an external address.'}
-              {transaction.type === 'token_added' &&
-                "A new token was added to the vault's supported token list."}
-              {transaction.type === 'token_removed' &&
-                "A token was removed from the vault's supported token list."}
-              {transaction.type === 'balance_synced' &&
-                "The vault's internal balance was synchronized with the on-chain balance."}
-              {transaction.type === 'auto_sync' &&
-                'An automatic balance synchronization was triggered due to the sync threshold being exceeded.'}
-            </p>
-          </div>
-        </div>
+                {/* To Address */}
+                {transaction.to && (
+                  <motion.div className="space-y-2" variants={itemVariants}>
+                    <label className="text-sm font-medium text-muted-foreground">To Address</label>
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <code className="flex-1 font-mono text-sm">{transaction.to}</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(transaction.to!)}
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(
+                            `https://sepolia.basescan.org/address/${transaction.to}`,
+                            '_blank'
+                          )
+                        }
+                      >
+                        <ExternalLink className="size-4" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
 
-        <div className="flex justify-end pt-4">
-          <Button onClick={onClose}>Close</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+                {/* Balance Changes */}
+                {transaction.oldBalance && transaction.newBalance && (
+                  <motion.div className="space-y-2" variants={itemVariants}>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Balance Changes
+                    </label>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-sm font-medium">Previous Balance</span>
+                        <span className="font-mono">{formatAmount(transaction.oldBalance)}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-sm font-medium">New Balance</span>
+                        <span className="font-mono">{formatAmount(transaction.newBalance)}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                        <span className="text-sm font-medium">Difference</span>
+                        <span className="font-mono text-primary">
+                          {formatAmount(
+                            (
+                              parseFloat(transaction.newBalance) -
+                              parseFloat(transaction.oldBalance)
+                            ).toString()
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Event Summary */}
+                <motion.div className="p-4 bg-muted/50 rounded-lg" variants={itemVariants}>
+                  <h4 className="font-medium mb-2">Event Summary</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {transaction.type === 'deposit' &&
+                      'Tokens were deposited into the vault from an external address.'}
+                    {transaction.type === 'withdrawal' &&
+                      'Tokens were withdrawn from the vault to an external address.'}
+                    {transaction.type === 'token_added' &&
+                      "A new token was added to the vault's supported token list."}
+                    {transaction.type === 'token_removed' &&
+                      "A token was removed from the vault's supported token list."}
+                    {transaction.type === 'balance_synced' &&
+                      "The vault's internal balance was synchronized with the on-chain balance."}
+                    {transaction.type === 'auto_sync' &&
+                      'An automatic balance synchronization was triggered due to the sync threshold being exceeded.'}
+                  </p>
+                </motion.div>
+              </motion.div>
+
+              <motion.div className="flex justify-end pt-4" variants={itemVariants}>
+                <Button onClick={onClose}>Close</Button>
+              </motion.div>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </AnimatePresence>
   );
 };
