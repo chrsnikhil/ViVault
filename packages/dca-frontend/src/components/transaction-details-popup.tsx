@@ -137,7 +137,7 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             {getEventIcon(transaction.type)}
