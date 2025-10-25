@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -30,7 +31,6 @@ import {
   RebalanceResult,
 } from '@/lib/rebalancing-service-new';
 import { VincentUniswapSwapService } from '@/lib/vincent-uniswap-swap';
-import { COMMON_TOKENS } from '@/config/contracts';
 import { useJwtContext } from '@lit-protocol/vincent-app-sdk/react';
 
 interface TokenBalance {
@@ -60,12 +60,59 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<RebalanceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    // Initialize theme state based on current document state
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
 
   // Initialize rebalancing service
   const [rebalancingService] = useState(() => {
     const swapService = new VincentUniswapSwapService('https://base-sepolia.public.blastapi.io');
     return new RebalancingService(swapService);
   });
+
+  // Theme detection
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark =
+        document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark');
+      console.log('🔍 Theme detection:', {
+        isDark,
+        classes: document.documentElement.className,
+        dataTheme: document.documentElement.getAttribute('data-theme'),
+        bodyClasses: document.body.className,
+      });
+      setIsDarkTheme(isDark);
+    };
+
+    // Check immediately
+    checkTheme();
+
+    // Also check after a short delay to catch late theme changes
+    const timeoutId = setTimeout(checkTheme, 100);
+
+    // Listen for theme changes
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Generate rebalancing preview
   const generatePreview = useCallback(async () => {
@@ -79,12 +126,21 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
     setPreview(null);
 
     try {
-      console.log('🔍 Generating rebalancing preview with route validation...');
+      console.log('🔍 ===== GENERATING REBALANCING PREVIEW =====');
+      console.log('🔍 All vault balances:', vaultBalances);
+      console.log('🔍 Selected rebalance type:', selectedType);
+      console.log('🔍 ===========================================');
 
       // Filter out tokens that shouldn't be rebalanced
-      const rebalanceableTokens = vaultBalances.filter(
-        (token) => !rebalancingService.shouldExcludeToken(token.address, token.symbol)
-      );
+      const rebalanceableTokens = vaultBalances.filter((token) => {
+        const shouldExclude = rebalancingService.shouldExcludeToken(token.address, token.symbol);
+        console.log(
+          `🔍 Token ${token.symbol} (${token.address}): exclude=${shouldExclude}, balance=${token.balance}`
+        );
+        return !shouldExclude;
+      });
+
+      console.log('🔍 Rebalanceable tokens after filtering:', rebalanceableTokens);
 
       if (rebalanceableTokens.length === 0) {
         setError('No rebalanceable tokens found (excluding USDC and ETH)');
@@ -96,6 +152,12 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
         rebalanceableTokens,
         selectedType
       );
+
+      console.log('🔍 ===== GENERATED PREVIEW =====');
+      console.log('🔍 Preview object:', preview);
+      console.log('🔍 Token plans:', preview.tokenPlans);
+      console.log('🔍 Total tokens:', preview.totalTokens);
+      console.log('🔍 =============================');
       setPreview(preview);
 
       if (preview.tokenPlans.length === 0) {
@@ -143,6 +205,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
 
       if (result.success) {
         console.log('✅ Rebalancing completed successfully');
+        setShowSuccessPopup(true);
         onRebalanceComplete?.(result);
       } else {
         console.error('❌ Rebalancing failed');
@@ -166,6 +229,210 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
 
   // Get configuration for selected type
   const config = rebalancingService.getRebalanceConfig(selectedType);
+
+  // Light theme rendering
+  const renderLightTheme = () => {
+    console.log('🔍 RENDERING LIGHT THEME');
+    return (
+      <div className="space-y-6">
+        <Separator />
+
+        {/* Current Vault State */}
+        <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+          <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-900">
+            <BarChart3 className="size-4" />
+            Current Vault State
+          </h4>
+          <div className="space-y-2">
+            {vaultBalances.length > 0 ? (
+              vaultBalances.map((token, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded-md"
+                >
+                  <span className="font-medium text-gray-900">{token.symbol}</span>
+                  <span className="font-mono text-gray-700">{token.balance}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <BarChart3 className="size-8 mx-auto mb-2 opacity-50" />
+                <p>No tokens in vault</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="font-semibold flex items-center gap-2 text-black">
+            <TrendingUp className="size-4" />
+            Rebalancing Preview
+          </h4>
+
+          {/* Strategy Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="text-center p-4 bg-linear-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+              <div className="text-2xl font-bold text-blue-900">{preview?.totalTokens || 0}</div>
+              <div className="text-sm text-blue-700">Tokens to Rebalance</div>
+            </div>
+            <div className="text-center p-4 bg-linear-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+              <div className="text-2xl font-bold text-green-900">
+                ~{preview?.estimatedUSDCReceived || '0.000000'} USDC
+              </div>
+              <div className="text-sm text-green-700">Estimated Received</div>
+            </div>
+            <div className="text-center p-4 bg-linear-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+              <div className="text-2xl font-bold text-orange-900">{selectedType.toUpperCase()}</div>
+              <div className="text-sm text-orange-700">Strategy</div>
+            </div>
+          </div>
+
+          {/* Strategy Explanation */}
+          <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-900">
+              <TrendingUp className="size-4" />
+              Strategy Details
+              <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                {selectedType.toUpperCase()}
+              </Badge>
+            </h4>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {selectedType === 'soft' &&
+                'Conservative rebalancing - 15% of each token will be converted to USDC. Maintains most of your current holdings while taking some profit.'}
+              {selectedType === 'medium' &&
+                'Balanced rebalancing - 40% of each token will be converted to USDC. Moderate risk approach that balances growth with stability.'}
+              {selectedType === 'aggressive' &&
+                'Aggressive rebalancing - 70% of each token will be converted to USDC. High-risk strategy for maximum profit-taking.'}
+            </p>
+          </div>
+
+          {/* Total Summary */}
+          <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <h4 className="font-medium mb-3 flex items-center gap-2 text-gray-900">
+              <DollarSign className="size-4" />
+              Total Summary
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 rounded-md">
+                <span className="text-gray-600">Total Tokens Swapped:</span>
+                <span className="ml-2 font-mono font-medium text-gray-900">
+                  {preview?.totalAmountToSwap || '0.000000'}
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-md">
+                <span className="text-gray-600">Total USDC Expected:</span>
+                <span className="ml-2 font-mono font-medium text-gray-900">
+                  ~{preview?.estimatedUSDCReceived || '0.000000'} USDC
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Dark theme rendering
+  const renderDarkTheme = () => {
+    console.log('🔍 RENDERING DARK THEME');
+    return (
+      <div className="space-y-6">
+        <Separator />
+
+        {/* Current Vault State */}
+        <div className="p-4 bg-black rounded-lg border border-gray-800 shadow-sm">
+          <h4 className="font-medium mb-3 flex items-center gap-2 text-orange-100">
+            <BarChart3 className="size-4" />
+            Current Vault State
+          </h4>
+          <div className="space-y-2">
+            {vaultBalances.length > 0 ? (
+              vaultBalances.map((token, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-sm p-2 bg-gray-900 rounded-md"
+                >
+                  <span className="font-medium text-orange-400">{token.symbol}</span>
+                  <span className="font-mono text-orange-300">{token.balance}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-orange-400">
+                <BarChart3 className="size-8 mx-auto mb-2 opacity-50" />
+                <p>No tokens in vault</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="font-semibold flex items-center gap-2 text-orange-400">
+            <TrendingUp className="size-4" />
+            Rebalancing Preview
+          </h4>
+
+          {/* Strategy Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-black rounded-lg border border-gray-800 shadow-sm">
+            <div className="text-center p-4 bg-linear-to-br from-blue-900 to-blue-800 rounded-lg border border-blue-700">
+              <div className="text-2xl font-bold text-blue-100">{preview?.totalTokens || 0}</div>
+              <div className="text-sm text-blue-200">Tokens to Rebalance</div>
+            </div>
+            <div className="text-center p-4 bg-linear-to-br from-green-900 to-green-800 rounded-lg border border-green-700">
+              <div className="text-2xl font-bold text-green-100">
+                ~{preview?.estimatedUSDCReceived || '0.000000'} USDC
+              </div>
+              <div className="text-sm text-green-200">Estimated Received</div>
+            </div>
+            <div className="text-center p-4 bg-linear-to-br from-orange-900 to-orange-800 rounded-lg border border-orange-700">
+              <div className="text-2xl font-bold text-orange-100">{selectedType.toUpperCase()}</div>
+              <div className="text-sm text-orange-200">Strategy</div>
+            </div>
+          </div>
+
+          {/* Strategy Explanation */}
+          <div className="p-4 bg-black rounded-lg border border-gray-800 shadow-sm">
+            <h4 className="font-medium mb-3 flex items-center gap-2 text-orange-100">
+              <TrendingUp className="size-4" />
+              Strategy Details
+              <Badge className="bg-orange-900 text-orange-200 border-orange-700">
+                {selectedType.toUpperCase()}
+              </Badge>
+            </h4>
+            <p className="text-sm text-orange-200 leading-relaxed">
+              {selectedType === 'soft' &&
+                'Conservative rebalancing - 15% of each token will be converted to USDC. Maintains most of your current holdings while taking some profit.'}
+              {selectedType === 'medium' &&
+                'Balanced rebalancing - 40% of each token will be converted to USDC. Moderate risk approach that balances growth with stability.'}
+              {selectedType === 'aggressive' &&
+                'Aggressive rebalancing - 70% of each token will be converted to USDC. High-risk strategy for maximum profit-taking.'}
+            </p>
+          </div>
+
+          {/* Total Summary */}
+          <div className="p-4 bg-black rounded-lg border border-gray-800 shadow-sm">
+            <h4 className="font-medium mb-3 flex items-center gap-2 text-orange-100">
+              <DollarSign className="size-4" />
+              Total Summary
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-gray-900 rounded-md">
+                <span className="text-orange-300">Total Tokens Swapped:</span>
+                <span className="ml-2 font-mono font-medium text-orange-400">
+                  {preview?.totalAmountToSwap || '0.000000'}
+                </span>
+              </div>
+              <div className="p-3 bg-gray-900 rounded-md">
+                <span className="text-orange-300">Total USDC Expected:</span>
+                <span className="ml-2 font-mono font-medium text-orange-400">
+                  ~{preview?.estimatedUSDCReceived || '0.000000'} USDC
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card className="w-full">
@@ -236,89 +503,15 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
               </>
             )}
           </Button>
-
-          {/* Debug Test Button */}
-          <Button
-            variant="outline"
-            onClick={async () => {
-              console.log('🧪 Testing vault tokens -> USDC routes...');
-
-              // Test each token in the vault
-              for (const token of vaultBalances) {
-                if (!rebalancingService.shouldExcludeToken(token.address, token.symbol)) {
-                  console.log(`🧪 Testing ${token.symbol} -> USDC...`);
-                  const hasRoute = await rebalancingService.testTokenRoute(
-                    token.address,
-                    COMMON_TOKENS.USDC,
-                    '0.001'
-                  );
-                  console.log(
-                    `🧪 ${token.symbol} result: ${hasRoute ? 'ROUTE EXISTS' : 'NO ROUTE'}`
-                  );
-                }
-              }
-
-              setError('Check console for route test results');
-            }}
-            disabled={isGeneratingPreview}
-            className="px-3"
-            title="Test all vault tokens -> USDC routes"
-          >
-            🧪
-          </Button>
         </div>
 
         {/* Preview Results */}
         {preview && (
-          <div className="space-y-4">
-            <Separator />
-
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <TrendingUp className="size-4" />
-                Rebalancing Preview
-              </h4>
-
-              {/* Summary */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{preview.totalTokens}</div>
-                  <div className="text-sm text-muted-foreground">Tokens to Rebalance</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    ~{preview.estimatedUSDCReceived} USDC
-                  </div>
-                  <div className="text-sm text-muted-foreground">Estimated Received</div>
-                </div>
-              </div>
-
-              {/* Token Details */}
-              <div className="space-y-2">
-                <h5 className="font-medium">Token Breakdown</h5>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {preview.tokenPlans.map((plan) => (
-                    <div
-                      key={plan.tokenAddress}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{plan.symbol}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {config.percentage}%
-                        </Badge>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium">{plan.amountToSwap} → USDC</div>
-                        <div className="text-xs text-muted-foreground">
-                          {plan.remainingBalance} remaining
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <>
+            {(() => {
+              console.log('🔍 Rendering theme:', isDarkTheme ? 'DARK' : 'LIGHT');
+              return isDarkTheme ? renderDarkTheme() : renderLightTheme();
+            })()}
 
             {/* Execute Button */}
             <Button
@@ -339,7 +532,7 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
                 </>
               )}
             </Button>
-          </div>
+          </>
         )}
 
         {/* Results */}
@@ -442,6 +635,63 @@ export const RebalancingPanel: React.FC<RebalancingPanelProps> = ({
             <Progress value={undefined} className="h-2" />
           </div>
         )}
+
+        {/* Success Popup */}
+        <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-black">
+                <CheckCircle className="size-5 text-green-600" />
+                Rebalancing Successful!
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-black mb-2">
+                  {result?.transactionHashes.length || 0} Swaps Executed
+                </div>
+                {result?.totalUSDCReceived && (
+                  <div className="text-lg text-black">
+                    Received ~{result.totalUSDCReceived} USDC
+                  </div>
+                )}
+              </div>
+
+              {result?.transactionHashes.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-black">Transaction Links</h4>
+                  <div className="space-y-1">
+                    {result.transactionHashes.map((hash, index) => {
+                      const stepNames = ['Withdraw from Vault', 'Approve Router', 'Execute Swap'];
+                      const stepName = stepNames[index] || `Transaction ${index + 1}`;
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 bg-muted rounded"
+                        >
+                          <span className="text-sm font-medium text-black">{stepName}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              window.open(`https://sepolia.basescan.org/tx/${hash}`, '_blank')
+                            }
+                          >
+                            <ExternalLink className="size-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={() => setShowSuccessPopup(false)}>Close</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

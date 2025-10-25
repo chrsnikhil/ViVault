@@ -101,7 +101,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     () => new VincentUniswapSwapService('https://base-sepolia.public.blastapi.io')
   );
 
-
   // Available tokens for swapping on Base Sepolia
   const availableTokens = useMemo(
     () => [
@@ -146,7 +145,9 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
               console.log('🔍 SwapPopup: Fresh vault info:', freshVaultInfo);
 
               // Find the token in fresh vault data
-              const vb = freshVaultInfo.balances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
+              const vb = freshVaultInfo.balances.find(
+                (b) => b.address.toLowerCase() === tokenIn.toLowerCase()
+              );
               if (vb) {
                 balance = ethers.utils.formatUnits(vb.balance, vb.decimals);
                 console.log(
@@ -156,13 +157,18 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
                   balance
                 );
               } else {
-                console.log('🔍 SwapPopup: Token not found in fresh vault data:', tokenInData.symbol);
+                console.log(
+                  '🔍 SwapPopup: Token not found in fresh vault data:',
+                  tokenInData.symbol
+                );
               }
             } catch (error) {
               console.error('🔍 SwapPopup: Error fetching fresh vault data:', error);
               // Fallback to stale prop data
               if (vaultBalances) {
-                const vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenIn.toLowerCase());
+                const vb = vaultBalances.find(
+                  (b) => b.address.toLowerCase() === tokenIn.toLowerCase()
+                );
                 if (vb) {
                   balance = vb.balance;
                   console.log('🔍 SwapPopup: Using stale vault balance as fallback:', balance);
@@ -196,7 +202,9 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
               const freshVaultInfo = await getVaultInfo(vaultAddress);
 
               // Find the token in fresh vault data
-              const vb = freshVaultInfo.balances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
+              const vb = freshVaultInfo.balances.find(
+                (b) => b.address.toLowerCase() === tokenOut.toLowerCase()
+              );
               if (vb) {
                 balance = ethers.utils.formatUnits(vb.balance, vb.decimals);
                 console.log(
@@ -206,16 +214,24 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
                   balance
                 );
               } else {
-                console.log('🔍 SwapPopup: Token not found in fresh vault data:', tokenOutData.symbol);
+                console.log(
+                  '🔍 SwapPopup: Token not found in fresh vault data:',
+                  tokenOutData.symbol
+                );
               }
             } catch (error) {
               console.error('🔍 SwapPopup: Error fetching fresh vault data for tokenOut:', error);
               // Fallback to stale prop data
               if (vaultBalances) {
-                const vb = vaultBalances.find((b) => b.address.toLowerCase() === tokenOut.toLowerCase());
+                const vb = vaultBalances.find(
+                  (b) => b.address.toLowerCase() === tokenOut.toLowerCase()
+                );
                 if (vb) {
                   balance = vb.balance;
-                  console.log('🔍 SwapPopup: Using stale vault balance as fallback for tokenOut:', balance);
+                  console.log(
+                    '🔍 SwapPopup: Using stale vault balance as fallback for tokenOut:',
+                    balance
+                  );
                 }
               }
             }
@@ -234,15 +250,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
     } catch (err) {
       console.error('Error loading balances:', err);
     }
-  }, [
-    authInfo,
-    tokenIn,
-    tokenOut,
-    vaultBalances,
-    vaultAddress,
-    availableTokens,
-    swapService,
-  ]);
+  }, [authInfo, tokenIn, tokenOut, vaultBalances, vaultAddress, availableTokens, swapService]);
 
   // Load token balances when popup opens or parameters change
   useEffect(() => {
@@ -390,17 +398,16 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
       // Check if WETH is supported in vault, if not, deposit a tiny amount to register it
       const supportedTokens = await vaultContract.getAllSupportedTokens();
       const isWETHSupported = supportedTokens.includes(tokenIn);
-      
+
       if (!isWETHSupported && tokenIn === '0x4200000000000000000000000000000000000006') {
         console.log('🔍 WETH not supported in vault, depositing tiny amount to register it...');
         try {
           // Deposit 1 wei of WETH to register it in the vault
           const tinyAmount = ethers.BigNumber.from(1); // 1 wei
-          const depositTx = await vincentSigner.sendContractTransaction(
-            vaultContract,
-            'deposit',
-            [tokenIn, tinyAmount]
-          );
+          const depositTx = await vincentSigner.sendContractTransaction(vaultContract, 'deposit', [
+            tokenIn,
+            tinyAmount,
+          ]);
           await depositTx.wait();
           console.log('✅ WETH registered in vault:', depositTx.hash);
         } catch (depositError) {
@@ -712,8 +719,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenInInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {tokenInInfo.balance}{' '}
-                {tokenInInfo.symbol}
+                Balance: {tokenInInfo.balance} {tokenInInfo.symbol}
               </div>
             )}
           </div>
@@ -768,8 +774,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             </Select>
             {tokenOutInfo && (
               <div className="text-sm text-muted-foreground">
-                Balance: {tokenOutInfo.balance}{' '}
-                {tokenOutInfo.symbol}
+                Balance: {tokenOutInfo.balance} {tokenOutInfo.symbol}
               </div>
             )}
           </div>
@@ -865,7 +870,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
           <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
             <CheckCircle className="size-4 text-green-600" />
             <AlertDescription className="text-sm">
-              <strong>✅ Multi-Token Swaps Available:</strong>
+              <strong>Multi-Token Swaps Available:</strong>
               <ul className="mt-2 space-y-1">
                 <li>• WETH, USDC, LINK, DAI, USDT supported</li>
                 <li>• Swaps tokens from your vault</li>

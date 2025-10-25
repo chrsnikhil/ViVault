@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Bot,
   Settings,
@@ -52,6 +53,18 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [rebalanceResult, setRebalanceResult] = useState<{
+    transactionHashes?: string[];
+    totalUSDCReceived?: string;
+  } | null>(null);
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    // Initialize theme state based on current document state
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
 
   // Get JWT from context
   const { authInfo } = useJwtContext();
@@ -63,6 +76,35 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   // Load initial data
   useEffect(() => {
     loadAutomationData();
+  }, []);
+
+  // Theme detection
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark =
+        document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark');
+      setIsDarkTheme(isDark);
+    };
+
+    // Check immediately
+    checkTheme();
+
+    // Also check after a short delay to catch late theme changes
+    const timeoutId = setTimeout(checkTheme, 100);
+
+    // Watch for theme changes
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
   }, []);
 
   const loadAutomationData = async () => {
@@ -168,6 +210,10 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
         setSuccess(`${type} rebalancing executed successfully!`);
         console.log('✅ Force rebalancing completed:', result.transactionHashes);
 
+        // Store result and show success popup
+        setRebalanceResult(result);
+        setShowSuccessPopup(true);
+
         // Reload automation data to update status
         await loadAutomationData();
       } else {
@@ -220,6 +266,140 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
       </Card>
     );
   }
+
+  // Light theme popup component (black-orange theme)
+  const SuccessPopupLight = () => (
+    <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+      <DialogContent className="max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-black">
+            <CheckCircle className="size-5 text-green-600" />
+            Rebalancing Successful!
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-black mb-2">
+              {rebalanceResult?.transactionHashes?.length || 0} Swaps Executed
+            </div>
+          </div>
+
+          {rebalanceResult?.transactionHashes && rebalanceResult.transactionHashes.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium text-black">Transaction Links</h4>
+              <div className="space-y-1">
+                {rebalanceResult.transactionHashes.map((hash: string, index: number) => {
+                  const stepNames = [
+                    'Sync Vault Balance',
+                    'Withdraw from Vault',
+                    'Approve Router',
+                    'Execute Swap',
+                    'Approve Vault',
+                    'Deposit to Vault',
+                  ];
+                  const stepName = stepNames[index] || `Step ${index + 1}`;
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-gray-100 rounded"
+                    >
+                      <span className="text-sm font-medium text-black">{stepName}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-black hover:bg-gray-200"
+                        onClick={() =>
+                          window.open(`https://sepolia.basescan.org/tx/${hash}`, '_blank')
+                        }
+                      >
+                        <ExternalLink className="size-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => setShowSuccessPopup(false)}
+              className="bg-black text-white hover:bg-gray-800"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Dark theme popup component (orange-black theme)
+  const SuccessPopupDark = () => (
+    <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+      <DialogContent className="max-w-md bg-black border-orange-500">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-400">
+            <CheckCircle className="size-5 text-green-500" />
+            Rebalancing Successful!
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-400 mb-2">
+              {rebalanceResult?.transactionHashes?.length || 0} Swaps Executed
+            </div>
+          </div>
+
+          {rebalanceResult?.transactionHashes && rebalanceResult.transactionHashes.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium text-orange-400">Transaction Links</h4>
+              <div className="space-y-1">
+                {rebalanceResult.transactionHashes.map((hash: string, index: number) => {
+                  const stepNames = [
+                    'Sync Vault Balance',
+                    'Withdraw from Vault',
+                    'Approve Router',
+                    'Execute Swap',
+                    'Approve Vault',
+                    'Deposit to Vault',
+                  ];
+                  const stepName = stepNames[index] || `Step ${index + 1}`;
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-gray-900 border border-orange-500/20 rounded"
+                    >
+                      <span className="text-sm font-medium text-orange-300">{stepName}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-orange-400 hover:bg-gray-800"
+                        onClick={() =>
+                          window.open(`https://sepolia.basescan.org/tx/${hash}`, '_blank')
+                        }
+                      >
+                        <ExternalLink className="size-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => setShowSuccessPopup(false)}
+              className="bg-orange-500 text-black hover:bg-orange-600"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <Card>
@@ -518,6 +698,9 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
           </Alert>
         )}
       </CardContent>
+
+      {/* Success Popup - Theme-aware rendering */}
+      {isDarkTheme ? <SuccessPopupDark /> : <SuccessPopupLight />}
     </Card>
   );
 };

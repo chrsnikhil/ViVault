@@ -10,7 +10,17 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { PriceFeedPage } from '@/pages/price-feed';
 import { VolatilityChart } from '@/components/volatility-chart';
 import RebalancingFlowDiagram from '@/components/rebalancing-flow-diagram';
-import { Menu, X, ArrowRight, CheckCircle, DollarSign, WalletIcon, TrendingUp } from 'lucide-react';
+import {
+  Menu,
+  X,
+  ArrowRight,
+  CheckCircle,
+  DollarSign,
+  WalletIcon,
+  TrendingUp,
+  ExternalLink,
+} from 'lucide-react';
+import { VOLATILITY_INDEX } from '@/config/contracts';
 
 export const Home: React.FC = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -448,22 +458,35 @@ export const Home: React.FC = () => {
 
                   {/* Right side - Example */}
                   <div>
-                    <h3 className="text-xl font-semibold text-foreground mb-4">Real Example</h3>
+                    <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                      Real Example
+                      <a
+                        href={`https://sepolia.basescan.org/address/${VOLATILITY_INDEX.ADDRESS}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="View volatility contract on Basescan"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </h3>
                     <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Week 1:</span>
-                        <span className="font-mono">$3,200 → $3,150</span>
-                        <span className="text-red-500">-1.56%</span>
+                        <span className="font-mono text-foreground">$3,200 → $3,150</span>
+                        <span className="text-red-500 dark:text-red-400 font-semibold">-1.56%</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Week 2:</span>
-                        <span className="font-mono">$3,150 → $3,300</span>
-                        <span className="text-green-500">+4.76%</span>
+                        <span className="font-mono text-foreground">$3,150 → $3,300</span>
+                        <span className="text-green-600 dark:text-green-400 font-semibold">
+                          +4.76%
+                        </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Week 3:</span>
-                        <span className="font-mono">$3,300 → $3,100</span>
-                        <span className="text-red-500">-6.06%</span>
+                        <span className="font-mono text-foreground">$3,300 → $3,100</span>
+                        <span className="text-red-500 dark:text-red-400 font-semibold">-6.06%</span>
                       </div>
                       <div className="border-t pt-2 mt-4">
                         <div className="flex justify-between font-semibold">

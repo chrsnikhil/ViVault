@@ -10,7 +10,9 @@ import {
   Clock,
   Play,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
+import { VOLATILITY_INDEX } from '@/config/contracts';
 import { useVolatilityIndex } from '@/hooks/useVolatilityIndex';
 import { useBackend } from '@/hooks/useBackend';
 
@@ -264,8 +266,17 @@ export function VolatilityIndexCard() {
           <div>
             <h3 className="text-lg font-semibold flex items-center gap-2">
               Volatility Index
+              <a
+                href={`https://sepolia.basescan.org/address/${VOLATILITY_INDEX.ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="View contract on Basescan"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
               {isUpdating && (
-                <div className="flex items-center gap-1 text-black">
+                <div className="flex items-center gap-1">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Updating...</span>
                 </div>

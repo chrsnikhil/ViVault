@@ -58,16 +58,6 @@ interface ApiEvent {
   timestamp: string;
 }
 
-interface ApiResponse {
-  UserVault_TokensReceived?: ApiEvent[];
-  UserVault_TokensWithdrawn?: ApiEvent[];
-  UserVault_TokenAdded?: ApiEvent[];
-  UserVault_TokenRemoved?: ApiEvent[];
-  UserVault_BalanceSynced?: ApiEvent[];
-  UserVault_AutoSyncTriggered?: ApiEvent[];
-  UserVault_OwnershipTransferred?: ApiEvent[];
-}
-
 interface VaultLogsListProps {
   onClose?: () => void;
 }
@@ -108,7 +98,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
     },
   };
 
-  // Fetch events from REST endpoint
+  // Fetch events from GraphQL endpoint
   const fetchEvents = useCallback(async () => {
     if (!authInfo?.pkp.ethAddress) {
       console.log('🔍 No user address available for fetching events');
@@ -121,13 +111,26 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
     try {
       console.log('🔍 Fetching events for user:', authInfo.pkp.ethAddress);
 
-      const response = await fetch('http://localhost:8080/api/rest/vault/events', {
+      // Try a simple query first to test the endpoint
+      const query = `
+        query {
+          UserVault_TokensReceived(limit: 10) {
+            id
+            token
+            amount
+            from
+            timestamp
+          }
+        }
+      `;
+
+      const response = await fetch('https://indexer.dev.hyperindex.xyz/474b6aa/v1/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userAddress: authInfo.pkp.ethAddress,
+          query,
         }),
       });
 
@@ -135,7 +138,13 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: ApiResponse = await response.json();
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+      }
+
+      const data = result.data;
       console.log('🔍 Received events data:', data);
 
       // Transform the data into a unified format
@@ -147,48 +156,6 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
           from: event.from,
           timestamp: event.timestamp,
           type: 'deposit' as const,
-        })),
-        ...(data.UserVault_TokensWithdrawn || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          amount: event.amount,
-          to: event.to,
-          timestamp: event.timestamp,
-          type: 'withdrawal' as const,
-        })),
-        ...(data.UserVault_TokenAdded || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          timestamp: event.timestamp,
-          type: 'token_added' as const,
-        })),
-        ...(data.UserVault_TokenRemoved || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          timestamp: event.timestamp,
-          type: 'token_removed' as const,
-        })),
-        ...(data.UserVault_BalanceSynced || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          oldBalance: event.oldBalance,
-          newBalance: event.newBalance,
-          timestamp: event.timestamp,
-          type: 'balance_synced' as const,
-        })),
-        ...(data.UserVault_AutoSyncTriggered || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          timestamp: event.timestamp,
-          type: 'auto_sync' as const,
-        })),
-        ...(data.UserVault_OwnershipTransferred || []).map((event: ApiEvent) => ({
-          id: event.id,
-          token: event.token,
-          from: event.from,
-          to: event.to,
-          timestamp: event.timestamp,
-          type: 'ownership_transferred' as const,
         })),
       ];
 
