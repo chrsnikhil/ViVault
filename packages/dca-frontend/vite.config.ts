@@ -72,6 +72,18 @@ export default defineConfig(({ command, mode }) => {
     },
     build: {
       sourcemap: true,
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            ui: ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs'],
+            charts: ['chart.js', 'react-chartjs-2'],
+            three: ['three', 'postprocessing'],
+            uniswap: ['@uniswap/sdk-core', '@uniswap/v3-sdk', '@uniswap/smart-order-router'],
+          },
+        },
+      },
     },
   };
 });

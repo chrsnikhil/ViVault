@@ -10,7 +10,7 @@
   "packageManager": "pnpm@10.7.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006 --no-open --ci",
