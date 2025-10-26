@@ -51,7 +51,7 @@ export const env = {
   VITE_BACKEND_URL: 'http://localhost:3001',
   VITE_EXPECTED_AUDIENCE: 'http://localhost:5173',
   VITE_IS_DEVELOPMENT: true,
-  VITE_REDIRECT_URI: 'http://localhost:5173',
+  VITE_REDIRECT_URI: 'https://frontend-production-b854.up.railway.app',
   VITE_SENTRY_DSN: undefined,
   VITE_SENTRY_FILTER: undefined,
 
