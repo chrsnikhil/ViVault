@@ -1,3 +1,5 @@
+import { env } from '@/config/env';
+
 export interface AutomationConfig {
   enabled: boolean;
   thresholds: {
@@ -31,7 +33,7 @@ export interface AutomationHistory {
 }
 
 export class AutomationService {
-  private baseUrl = 'http://localhost:3001/api/automation';
+  private baseUrl = `${env.VITE_BACKEND_URL}/api/automation`;
 
   /**
    * Get current automation status and configuration
