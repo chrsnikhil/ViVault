@@ -1,6 +1,9 @@
-import { getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
+import { getVincentAbilityClient as _getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
 import { bundledVincentAbility } from '@lit-protocol/vincent-ability-erc20-transfer';
 import { ethers } from 'ethers';
+
+// Cast to avoid deep type instantiation errors
+const getVincentAbilityClient = _getVincentAbilityClient as any;
 
 /**
  * Service for transferring WETH using Vincent ERC20 Transfer Ability This uses the official ERC20
@@ -30,7 +33,7 @@ export class VincentEthTransferService {
     this.delegateeSigner = new ethers.Wallet(delegateePrivateKey, this.provider);
 
     // Initialize Vincent ability client with ERC20 Transfer Ability
-    this.abilityClient = (getVincentAbilityClient as any)({
+    this.abilityClient = getVincentAbilityClient({
       bundledVincentAbility: bundledVincentAbility,
       ethersSigner: this.delegateeSigner,
     });

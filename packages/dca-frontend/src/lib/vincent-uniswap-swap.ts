@@ -1,9 +1,12 @@
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import { getSignedUniswapQuote } from '@lit-protocol/vincent-ability-uniswap-swap';
-import { getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
+import { getVincentAbilityClient as _getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
 import { bundledVincentAbility } from '@lit-protocol/vincent-ability-uniswap-swap';
 import { ethers } from 'ethers';
 import { env } from '../config/env';
+
+// Cast to avoid deep type instantiation errors
+const getVincentAbilityClient = _getVincentAbilityClient as any;
 
 export interface SwapQuote {
   quote: unknown; // UniswapQuote type
@@ -167,7 +170,7 @@ export class VincentUniswapSwapService {
 
     try {
       // Create ability client exactly as shown in docs
-      const abilityClient = (getVincentAbilityClient as any)({
+      const abilityClient = getVincentAbilityClient({
         bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
       });
@@ -230,7 +233,7 @@ export class VincentUniswapSwapService {
 
     try {
       // Create ability client exactly as shown in docs
-      const abilityClient = (getVincentAbilityClient as any)({
+      const abilityClient = getVincentAbilityClient({
         bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
       });

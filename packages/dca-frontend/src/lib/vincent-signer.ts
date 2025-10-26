@@ -1,6 +1,9 @@
-import { getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
+import { getVincentAbilityClient as _getVincentAbilityClient } from '@lit-protocol/vincent-app-sdk/abilityClient';
 import { bundledVincentAbility } from '@lit-protocol/vincent-ability-evm-transaction-signer';
 import { ethers } from 'ethers';
+
+// Cast to avoid deep type instantiation errors
+const getVincentAbilityClient = _getVincentAbilityClient as any;
 
 export class VincentSigner {
   private abilityClient: unknown;
@@ -75,7 +78,7 @@ export class VincentSigner {
       console.log('🔍 VincentSigner: JWT iat:', jwtPayload.iat);
       console.log('🔍 VincentSigner: JWT iss:', (jwtPayload as any).iss);
       console.log('🔍 VincentSigner: JWT aud:', (jwtPayload as any).aud);
-      this.abilityClient = (getVincentAbilityClient as any)({
+      this.abilityClient = getVincentAbilityClient({
         bundledVincentAbility: bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
         jwt: jwt,
