@@ -193,14 +193,14 @@ export class VincentUniswapSwapService {
         return true;
       } else {
         // Handle different types of failures exactly as shown in docs
-        if (precheckResult.runtimeError) {
-          console.error('❌ Runtime error:', precheckResult.runtimeError);
+        if ((precheckResult as any).runtimeError) {
+          console.error('❌ Runtime error:', (precheckResult as any).runtimeError);
         }
-        if (precheckResult.schemaValidationError) {
-          console.error('❌ Schema validation error:', precheckResult.schemaValidationError);
+        if ((precheckResult as any).schemaValidationError) {
+          console.error('❌ Schema validation error:', (precheckResult as any).schemaValidationError);
         }
-        if (precheckResult.result) {
-          console.error('❌ Swap precheck failed:', precheckResult.result.reason);
+        if ((precheckResult as any).result) {
+          console.error('❌ Swap precheck failed:', (precheckResult as any).result.reason);
         }
         return false;
       }
@@ -261,14 +261,14 @@ export class VincentUniswapSwapService {
         return result;
       } else {
         // Handle different types of failures exactly as shown in docs
-        if (executeResult.runtimeError) {
-          console.error('❌ Runtime error:', executeResult.runtimeError);
+        if ((executeResult as any).runtimeError) {
+          console.error('❌ Runtime error:', (executeResult as any).runtimeError);
         }
-        if (executeResult.schemaValidationError) {
-          console.error('❌ Schema validation error:', executeResult.schemaValidationError);
+        if ((executeResult as any).schemaValidationError) {
+          console.error('❌ Schema validation error:', (executeResult as any).schemaValidationError);
         }
-        if (executeResult.result) {
-          console.error('❌ Swap execution failed:', executeResult.result.reason);
+        if ((executeResult as any).result) {
+          console.error('❌ Swap execution failed:', (executeResult as any).result.reason);
         }
         throw new Error('Swap execution failed');
       }

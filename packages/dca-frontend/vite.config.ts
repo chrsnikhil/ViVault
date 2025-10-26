@@ -68,43 +68,24 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
         brotli: path.resolve(__dirname, './src/lib/brotli-mock.js'), // Mock brotli for browser
+        'scheduler': path.resolve(__dirname, './src/lib/scheduler-polyfill.ts'), // Scheduler polyfill
       },
     },
     build: {
       sourcemap: false, // Disable sourcemaps to save memory during build
       chunkSizeWarningLimit: 1000,
       minify: 'esbuild', // Use faster esbuild instead of terser
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true,
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // More aggressive chunk splitting to reduce memory usage
+            // Simple chunk splitting to avoid circular dependencies
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'vendor-react';
-              }
-              if (id.includes('@radix-ui')) {
-                return 'vendor-ui';
-              }
-              if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-                return 'vendor-charts';
-              }
-              if (id.includes('three') || id.includes('postprocessing')) {
-                return 'vendor-three';
-              }
-              if (id.includes('@uniswap')) {
-                return 'vendor-uniswap';
-              }
-              if (id.includes('@lit-protocol')) {
-                return 'vendor-lit';
-              }
-              if (id.includes('ethers')) {
-                return 'vendor-ethers';
-              }
-              if (id.includes('framer-motion')) {
-                return 'vendor-motion';
-              }
-              // All other node_modules
-              return 'vendor-other';
+              // Keep all node_modules in one chunk to avoid circular dependency issues
+              return 'vendor';
             }
           },
         },

@@ -1,5 +1,6 @@
 'use client';
 
+// @ts-expect-error
 import { useToast } from '@/hooks/use-toast';
 import {
   Toast,

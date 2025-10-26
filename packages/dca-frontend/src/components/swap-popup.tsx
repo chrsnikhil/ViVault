@@ -37,6 +37,7 @@ import { COMMON_TOKENS, USER_VAULT_ABI, ERC20_ABI } from '@/config/contracts';
 import { VincentSigner } from '@/lib/vincent-signer';
 import { env } from '@/config/env';
 import { ethers } from 'ethers';
+import { useVault } from '@/hooks/useVault';
 
 interface TokenInfo {
   address: string;
@@ -66,6 +67,7 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
   onSwapComplete,
 }) => {
   const { authInfo } = useJwtContext();
+  const { getVaultInfo } = useVault();
 
   // State
   const [loading, setLoading] = useState(false);
@@ -140,7 +142,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             try {
               // Fetch fresh vault data instead of using stale vaultBalances prop
               console.log('🔍 SwapPopup: Fetching fresh vault data for address:', vaultAddress);
-              const { getVaultInfo } = await import('@/hooks/useVault');
               const freshVaultInfo = await getVaultInfo(vaultAddress);
               console.log('🔍 SwapPopup: Fresh vault info:', freshVaultInfo);
 
@@ -198,7 +199,6 @@ export const SwapPopup: React.FC<SwapPopupProps> = ({
             try {
               // Fetch fresh vault data instead of using stale vaultBalances prop
               console.log('🔍 SwapPopup: Fetching fresh vault data for tokenOut:', tokenOut);
-              const { getVaultInfo } = await import('@/hooks/useVault');
               const freshVaultInfo = await getVaultInfo(vaultAddress);
 
               // Find the token in fresh vault data

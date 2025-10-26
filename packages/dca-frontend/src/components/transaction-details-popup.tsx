@@ -2,7 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   ArrowUpDown,
   ArrowDownUp,
@@ -24,7 +24,7 @@ interface VaultEvent {
   oldBalance?: string;
   newBalance?: string;
   timestamp: string;
-  type: 'deposit' | 'withdrawal' | 'token_added' | 'token_removed' | 'balance_synced' | 'auto_sync';
+  type: 'deposit' | 'withdrawal' | 'token_added' | 'token_removed' | 'balance_synced' | 'auto_sync' | 'ownership_transferred';
 }
 
 interface TransactionDetailsPopupProps {
@@ -52,7 +52,7 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
       scale: 1,
       y: 0,
       transition: {
-        type: 'spring',
+        type: 'spring' as const,
         stiffness: 300,
         damping: 30,
         duration: 0.3,
@@ -66,7 +66,7 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
         duration: 0.2,
       },
     },
-  };
+  } as Variants;
 
   const itemVariants = {
     hidden: { opacity: 0, y: 10 },
@@ -75,10 +75,10 @@ export const TransactionDetailsPopup: React.FC<TransactionDetailsPopupProps> = (
       y: 0,
       transition: {
         duration: 0.2,
-        ease: [0.25, 0.46, 0.45, 0.94],
+        ease: [0.25, 0.46, 0.45, 0.94] as const,
       },
     },
-  };
+  } as Variants;
 
   const getEventIcon = (type: VaultEvent['type']) => {
     switch (type) {

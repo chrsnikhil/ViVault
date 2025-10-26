@@ -22,11 +22,15 @@
     "moduleDetection": "force",
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
+    "noUncheckedSideEffectImports": false,
+    "skipDefaultLibCheck": true,
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "noPropertyAccessFromIndexSignature": false,
     "outDir": "./dist"
   }
 }

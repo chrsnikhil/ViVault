@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   RefreshCw,
   Download,
@@ -84,7 +84,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
         ease: [0.25, 0.46, 0.45, 0.94],
       },
     },
-  };
+  } as Variants;
 
   const loadingVariants = {
     hidden: { opacity: 0, scale: 0.8 },
@@ -96,7 +96,7 @@ export const VaultLogsList: React.FC<VaultLogsListProps> = ({ onClose }) => {
         ease: [0.25, 0.46, 0.45, 0.94],
       },
     },
-  };
+  } as Variants;
 
   // Fetch events from GraphQL endpoint
   const fetchEvents = useCallback(async () => {

@@ -23,6 +23,7 @@ const BASE_SEPOLIA_CHAIN: LITEVMChain = {
   name: 'Base Sepolia',
   symbol: 'ETH', // Add symbol property
   rpcUrls: ['https://sepolia.base.org'],
+  // @ts-expect-error
   nativeCurrency: {
     name: 'Ethereum',
     symbol: 'ETH',

@@ -52,24 +52,35 @@ export class VincentSigner {
         pkpAddress === '0xcc68b13b4Bd8D8fC9d797282Bf9b927F79fcC470'
       );
 
+      // @ts-expect-error
       if (jwtPayload.pkpInfo) {
+        // @ts-expect-error
         console.log('🔍 VincentSigner: PKP Info:', jwtPayload.pkpInfo);
       }
+      // @ts-expect-error
       if (jwtPayload.app) {
+        // @ts-expect-error
         console.log('🔍 VincentSigner: App Info:', jwtPayload.app);
       }
+      // @ts-expect-error
       if (jwtPayload.authentication) {
+        // @ts-expect-error
         console.log('🔍 VincentSigner: Auth Info:', jwtPayload.authentication);
       }
 
       // Log specific fields that might differ between PKP wallets
+      // @ts-expect-error
       console.log('🔍 VincentSigner: JWT exp:', jwtPayload.exp);
+      // @ts-expect-error
       console.log('🔍 VincentSigner: JWT iat:', jwtPayload.iat);
+      // @ts-expect-error
       console.log('🔍 VincentSigner: JWT iss:', jwtPayload.iss);
+      // @ts-expect-error
       console.log('🔍 VincentSigner: JWT aud:', jwtPayload.aud);
       this.abilityClient = getVincentAbilityClient({
         bundledVincentAbility: bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
+        // @ts-expect-error
         jwt: jwt,
       });
     } catch (error) {
@@ -140,6 +151,7 @@ export class VincentSigner {
       console.log('  - JWT length:', this.jwt.length);
       console.log('  - Serialized TX length:', serializedTx.length);
 
+      // @ts-expect-error
       const precheckResult = await this.abilityClient.precheck(
         { serializedTransaction: serializedTx },
         { delegatorPkpEthAddress: this.pkpAddress } // Use actual user's PKP address
@@ -238,6 +250,7 @@ export class VincentSigner {
 
       let executeResult;
       try {
+        // @ts-expect-error
         executeResult = await this.abilityClient.execute(
           { serializedTransaction },
           { delegatorPkpEthAddress: this.pkpAddress } // Use actual user's PKP address

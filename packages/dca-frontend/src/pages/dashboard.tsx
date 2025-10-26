@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { WalletModal } from '@/components/wallet-modal';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { VaultManager } from '@/components/vault-manager';
@@ -18,11 +18,11 @@ export const Dashboard: React.FC = () => {
   const fadeInUp = {
     hidden: { opacity: 0, y: 12 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
-  };
+  } as Variants;
   const stagger = {
     hidden: {},
     visible: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
-  };
+  } as Variants;
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');

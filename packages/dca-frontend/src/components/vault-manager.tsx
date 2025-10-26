@@ -1280,7 +1280,6 @@ export const VaultManager: React.FC = () => {
               exit="exit"
             >
               <VaultLogsList
-                vaultAddress={vaultAddress}
                 onClose={() => setLogsSidebarOpen(false)}
               />
 

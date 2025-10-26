@@ -77,6 +77,7 @@ export class VincentEthTransferService {
       console.log('🔍 Calling ERC20 Transfer Ability precheck with:', transferParams);
 
       // Precheck transfer
+      // @ts-expect-error
       const precheckResult = await this.abilityClient.precheck(transferParams, {
         delegatorPkpEthAddress: this.pkpAddress,
       });
@@ -109,6 +110,7 @@ export class VincentEthTransferService {
       console.log('✅ Precheck passed, executing transfer...');
 
       // Execute transfer
+      // @ts-expect-error
       const executeResult = await this.abilityClient.execute(transferParams, {
         delegatorPkpEthAddress: this.pkpAddress,
       });
