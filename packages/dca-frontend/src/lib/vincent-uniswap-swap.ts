@@ -167,7 +167,7 @@ export class VincentUniswapSwapService {
 
     try {
       // Create ability client exactly as shown in docs
-      const abilityClient = getVincentAbilityClient({
+      const abilityClient = (getVincentAbilityClient as any)({
         bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
       });
@@ -230,7 +230,7 @@ export class VincentUniswapSwapService {
 
     try {
       // Create ability client exactly as shown in docs
-      const abilityClient = getVincentAbilityClient({
+      const abilityClient = (getVincentAbilityClient as any)({
         bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
       });

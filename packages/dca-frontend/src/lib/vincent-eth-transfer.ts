@@ -30,7 +30,7 @@ export class VincentEthTransferService {
     this.delegateeSigner = new ethers.Wallet(delegateePrivateKey, this.provider);
 
     // Initialize Vincent ability client with ERC20 Transfer Ability
-    this.abilityClient = getVincentAbilityClient({
+    this.abilityClient = (getVincentAbilityClient as any)({
       bundledVincentAbility: bundledVincentAbility,
       ethersSigner: this.delegateeSigner,
     });

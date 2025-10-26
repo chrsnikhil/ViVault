@@ -75,12 +75,11 @@ export class VincentSigner {
       console.log('🔍 VincentSigner: JWT iat:', jwtPayload.iat);
       console.log('🔍 VincentSigner: JWT iss:', (jwtPayload as any).iss);
       console.log('🔍 VincentSigner: JWT aud:', (jwtPayload as any).aud);
-      this.abilityClient = getVincentAbilityClient({
+      this.abilityClient = (getVincentAbilityClient as any)({
         bundledVincentAbility: bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
-        // @ts-expect-error - jwt property not in type definition
         jwt: jwt,
-      }) as any;
+      });
     } catch (error) {
       console.error('❌ VincentSigner: Failed to initialize ability client:', error);
       throw error;
