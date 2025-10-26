@@ -173,7 +173,7 @@ export class VincentUniswapSwapService {
       });
 
       // Run precheck exactly as shown in docs
-      const precheckResult = await abilityClient.precheck(
+      const precheckResult = await (abilityClient as any).precheck(
         {
           alchemyGasSponsor: false,
           action: 'swap',
@@ -236,7 +236,7 @@ export class VincentUniswapSwapService {
       });
 
       // Execute the swap exactly as shown in docs
-      const executeResult = await abilityClient.execute(
+      const executeResult = await (abilityClient as any).execute(
         {
           alchemyGasSponsor: false,
           action: 'swap',

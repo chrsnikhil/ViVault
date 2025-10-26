@@ -73,16 +73,14 @@ export class VincentSigner {
       console.log('🔍 VincentSigner: JWT exp:', jwtPayload.exp);
       // @ts-expect-error
       console.log('🔍 VincentSigner: JWT iat:', jwtPayload.iat);
-      // @ts-expect-error
-      console.log('🔍 VincentSigner: JWT iss:', jwtPayload.iss);
-      // @ts-expect-error
-      console.log('🔍 VincentSigner: JWT aud:', jwtPayload.aud);
+      console.log('🔍 VincentSigner: JWT iss:', (jwtPayload as any).iss);
+      console.log('🔍 VincentSigner: JWT aud:', (jwtPayload as any).aud);
       this.abilityClient = getVincentAbilityClient({
         bundledVincentAbility: bundledVincentAbility,
         ethersSigner: this.delegateeSigner,
-        // @ts-expect-error
+        // @ts-expect-error - jwt property not in type definition
         jwt: jwt,
-      });
+      }) as any;
     } catch (error) {
       console.error('❌ VincentSigner: Failed to initialize ability client:', error);
       throw error;
@@ -151,8 +149,7 @@ export class VincentSigner {
       console.log('  - JWT length:', this.jwt.length);
       console.log('  - Serialized TX length:', serializedTx.length);
 
-      // @ts-expect-error
-      const precheckResult = await this.abilityClient.precheck(
+      const precheckResult = await (this.abilityClient as any).precheck(
         { serializedTransaction: serializedTx },
         { delegatorPkpEthAddress: this.pkpAddress } // Use actual user's PKP address
       );
