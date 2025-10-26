@@ -71,17 +71,47 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     build: {
-      sourcemap: true,
+      sourcemap: false, // Disable sourcemaps to save memory during build
       chunkSizeWarningLimit: 1000,
+      minify: 'esbuild', // Use faster esbuild instead of terser
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            ui: ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs'],
-            charts: ['chart.js', 'react-chartjs-2'],
-            three: ['three', 'postprocessing'],
-            uniswap: ['@uniswap/sdk-core', '@uniswap/v3-sdk', '@uniswap/smart-order-router'],
+          manualChunks(id) {
+            // More aggressive chunk splitting to reduce memory usage
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react';
+              }
+              if (id.includes('@radix-ui')) {
+                return 'vendor-ui';
+              }
+              if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('three') || id.includes('postprocessing')) {
+                return 'vendor-three';
+              }
+              if (id.includes('@uniswap')) {
+                return 'vendor-uniswap';
+              }
+              if (id.includes('@lit-protocol')) {
+                return 'vendor-lit';
+              }
+              if (id.includes('ethers')) {
+                return 'vendor-ethers';
+              }
+              if (id.includes('framer-motion')) {
+                return 'vendor-motion';
+              }
+              // All other node_modules
+              return 'vendor-other';
+            }
           },
+        },
+        onwarn(warning, warn) {
+          // Suppress specific warnings to reduce noise during build
+          if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
+          warn(warning);
         },
       },
     },
